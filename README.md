@@ -36,6 +36,7 @@ npm start
 | `npm run dev` | Next.js dev server |
 | `npm run seed` | Wipe and refill `data/heroes-tournament.db` as of today (Moscow) |
 | `npm run advance` | Close past disputes and announce today's disputes in `data/heroes-tournament.db` (Moscow date) |
+| `npm run bot` | Long-polling Telegram bot for tables, hero cards, crowd ballots, and battle notifications |
 | `npm test` | Vitest (`src/**/*.test.ts`) |
 | `npm run build` / `npm start` | Production build and server |
 
@@ -57,6 +58,27 @@ Create a daily task triggered at `12:00` in the `Russian Standard Time` (`Europe
 ```powershell
 schtasks /Create /SC DAILY /TN "HeroesTournamentAdvance" /TR "cmd /c cd /d C:\Projects\games\HeroesTournament && npm run advance" /ST 12:00 /F
 ```
+
+## Telegram bot
+
+The bot runs as a standalone process against the same `data/heroes-tournament.db` file and uses native `fetch` against the Telegram Bot API (long polling, no webhook required).
+
+1. Copy `.env.example` to `.env` and set `TELEGRAM_BOT_KEY`.
+2. Optionally set `TELEGRAM_CHANNEL_ID` (for example `@heroes_cup` or `-100...`) and grant the bot permission to post in that channel.
+3. Start the bot:
+
+```bash
+npm run bot
+```
+
+Features available in direct chat and via persistent menu buttons:
+
+- **Tables (`/tables`)** — switch between Group A–D standings and the knockout bracket of the active cup.
+- **Billboard (`/today`)** — today's announced disputes (open dominants and appeals) and upcoming scheduled pairs open for voting.
+- **Heroes (`/heroes` or `/hero <name>`)** — paginated catalog of all 50 heroes with full cards (origin, epithet, Elo, record, five dominants, and five appeals).
+- **Ratings (`/ratings`)** — top Elo leaderboard and ledger verification status.
+- **Vote (`/vote`)** — step-by-step crowd ballot (`dispute → hero → skill → primary/secondary stat`) written directly via `castDisputeBallot` for the linked Telegram account (`upsertOAuthUser`).
+- **Notifications (`/notify`)** — toggle personal notifications on or off. Every minute the bot runs `syncPortalTimeline` and broadcasts newly completed battle results and newly announced battles to `TELEGRAM_CHANNEL_ID` and subscribed users, recording sent items in `telegram_outbound` to prevent duplicates.
 
 ## Pages
 
@@ -121,6 +143,7 @@ The default seed builds eleven editions relative to today (`src/db/engine.ts`, `
 ```text
 src/domain/     roster, domains, exchange formula, Elo, bracket, seeded RNG
 src/db/         SQLite schema, bootstrap, seed, queries
+src/bot/        Telegram Bot API long-polling client, menus, ballot flow, and notifications
 src/i18n/       en / es / ru dictionaries and hero-skill copy
 src/app/        App Router pages and the locale route
 src/components/ UI
@@ -134,4 +157,4 @@ Hero names in the database stay in their canonical form. Translated epithets, or
 
 ## Tests
 
-`npm test` covers the exchange formula, domain ring, Elo ledger, tournament draw, monograms, seed invariants, and locale negotiation. The seed test builds an in-memory database and checks that completed disputes, announcements, and the rating ledger stay consistent.
+`npm test` covers the exchange formula, domain ring, Elo ledger, tournament draw, monograms, seed invariants, locale negotiation, and Telegram bot handlers, ballot casting, and notification deduplication. The seed test builds an in-memory database and checks that completed disputes, announcements, and the rating ledger stay consistent.

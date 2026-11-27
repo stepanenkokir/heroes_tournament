@@ -217,3 +217,20 @@ export const disputeCommentariesTable = sqliteTable("dispute_commentaries", {
   keyTurn: text("key_turn").notNull(),
   modelTag: text("model_tag").notNull()
 });
+
+export const telegramSubscribersTable = sqliteTable("telegram_subscribers", {
+  chatId: text("chat_id").primaryKey(),
+  userId: text("user_id").notNull(),
+  username: text("username"),
+  displayName: text("display_name").notNull(),
+  notifyEnabled: integer("notify_enabled", { mode: "boolean" }).notNull(),
+  linkedAt: text("linked_at").notNull()
+});
+
+export const telegramOutboundTable = sqliteTable("telegram_outbound", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(), // "result" | "announce"
+  disputeId: text("dispute_id").notNull(),
+  sentAt: text("sent_at").notNull()
+});
+
