@@ -191,8 +191,8 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
                       acclaimAgainst: 0,
                       acclaimDiff: 0,
                       retentionFor: 0,
-                      qualified: idx < 2,
-                      tieBreakNote: messages.cup.potSeedNote
+                      qualified: false,
+                      tieBreakNote: null
                     }))
                 : group.standings;
 
@@ -235,10 +235,7 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
                     <tbody>
                       {displayRows.map((row) => {
                         const hero = localizeHero(row.hero, locale);
-                        const note =
-                          groupSliceMode === "current"
-                            ? localizeTieBreak(row.tieBreakNote, messages)
-                            : row.tieBreakNote;
+                        const note = localizeTieBreak(row.tieBreakNote, messages);
                         return (
                           <tr
                             key={row.heroId}

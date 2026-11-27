@@ -1,15 +1,12 @@
 import { asc, desc, eq } from "drizzle-orm";
 import {
   computeGroupStandings,
-  DOMAIN_META,
   getGroupCodes,
   INITIAL_ELO_RATING,
   PLAYOFF_BLUEPRINT,
   verifyRatingLedger,
   type CompletedGroupMatchRecord,
   type DisputeSide,
-  type DisputeStage,
-  type DomainId,
   type GroupAssignment,
   type GroupStandingRow
 } from "../domain/index";
@@ -52,7 +49,6 @@ export interface DisputeCardView {
 
 export interface GroupTableView {
   groupCode: string;
-  title: string;
   standings: Array<
     GroupStandingRow & {
       hero: HeroRow;
@@ -68,7 +64,6 @@ export interface TournamentFullView {
   runnerUp: HeroRow | null;
   groups: GroupTableView[];
   playoffs: Array<{
-    blueprintTitle: string;
     card: DisputeCardView;
   }>;
   days: Array<{
@@ -76,7 +71,6 @@ export interface TournamentFullView {
     dayNumber: number;
     scheduledDate: string;
     isToday: boolean;
-    stageLabel: string;
     disputes: DisputeCardView[];
   }>;
 }
@@ -255,7 +249,6 @@ export function getTournamentFullView(slugOrActive: string | "active"): Tourname
 
     groups.push({
       groupCode: code,
-      title: `Группа ${code}`,
       standings: rawStandings.map((row) => ({
         ...row,
         hero: heroMap.get(row.heroId)!,
@@ -268,7 +261,6 @@ export function getTournamentFullView(slugOrActive: string | "active"): Tourname
   const playoffs = PLAYOFF_BLUEPRINT.map((bp) => {
     const found = cards.find((c) => c.dispute.playoffSlot === bp.slotCode)!;
     return {
-      blueprintTitle: bp.title,
       card: found
     };
   });
@@ -276,17 +268,12 @@ export function getTournamentFullView(slugOrActive: string | "active"): Tourname
   const days = Array.from({ length: 13 }, (_, dayOffset) => {
     const dayCards = cards.filter((c) => c.dispute.dayOffset === dayOffset);
     const scheduledDate = dayCards[0]?.dispute.scheduledDate ?? tournament.startDate;
-    const stageLabel =
-      dayOffset < 6
-        ? `Групповой этап · День ${dayOffset + 1} из 6`
-        : (PLAYOFF_BLUEPRINT.find((b) => b.dayOffset === dayOffset)?.title ?? "Плей-офф");
 
     return {
       dayOffset,
       dayNumber: dayOffset + 1,
       scheduledDate,
       isToday: scheduledDate === todayIso,
-      stageLabel,
       disputes: dayCards
     };
   });
@@ -328,9 +315,7 @@ export function getDisputeProtocolView(disputeId: string) {
   const exchanges = exchangeRows.map((ex) => ({
     row: ex,
     dominantSkill: skillMap.get(ex.dominantSkillId)!,
-    appealSkill: skillMap.get(ex.appealSkillId)!,
-    dominantDomainMeta: DOMAIN_META[ex.dominantDomain as DomainId],
-    appealDomainMeta: DOMAIN_META[ex.appealDomain as DomainId]
+    appealSkill: skillMap.get(ex.appealSkillId)!
   }));
 
   const ratingEvents = db
@@ -465,19 +450,4 @@ export function getHeroProfileView(slug: string) {
     ledger,
     activeDisputes
   };
-}
-
-export function getStageRussianLabel(stage: DisputeStage | string, groupCode?: string | null): string {
-  switch (stage) {
-    case "group":
-      return groupCode ? `Группа ${groupCode}` : "Групповой этап";
-    case "qf":
-      return "Четвертьфинал";
-    case "sf":
-      return "Полуфинал";
-    case "final":
-      return "Финал Кубка";
-    default:
-      return stage;
-  }
 }

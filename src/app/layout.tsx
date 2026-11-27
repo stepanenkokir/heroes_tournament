@@ -24,8 +24,30 @@ export default async function RootLayout({
 }>) {
   const locale = await getLocale();
   const nextPath = await getRequestPath();
+  const pathname = nextPath.split("?")[0] ?? "/";
   const messages = getMessages(locale);
   const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
+
+  const navItems = [
+    { href: "/", label: messages.nav.today, current: pathname === "/" },
+    {
+      href: "/tournament",
+      label: messages.nav.current,
+      current: pathname === "/tournament",
+      accent: true
+    },
+    {
+      href: "/tournaments",
+      label: messages.nav.archive,
+      current: pathname === "/tournaments" || pathname.startsWith("/tournaments/")
+    },
+    {
+      href: "/ratings",
+      label: messages.nav.ratings,
+      current: pathname === "/ratings" || pathname.startsWith("/heroes/")
+    },
+    { href: "/rules", label: messages.nav.rules, current: pathname === "/rules" }
+  ];
 
   return (
     <html lang={locale} data-theme={theme}>
@@ -50,21 +72,18 @@ export default async function RootLayout({
                 />
                 <LocaleSwitcher locale={locale} nextPath={nextPath} />
                 <nav className="site-nav" aria-label={messages.nav.aria}>
-                  <Link href="/" className="site-nav__link">
-                    {messages.nav.today}
-                  </Link>
-                  <Link href="/tournament" className="site-nav__link site-nav__link--accent">
-                    {messages.nav.current}
-                  </Link>
-                  <Link href="/tournaments" className="site-nav__link">
-                    {messages.nav.archive}
-                  </Link>
-                  <Link href="/ratings" className="site-nav__link">
-                    {messages.nav.ratings}
-                  </Link>
-                  <Link href="/rules" className="site-nav__link">
-                    {messages.nav.rules}
-                  </Link>
+                  {navItems.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={item.current ? "page" : undefined}
+                      className={`site-nav__link${item.accent ? " site-nav__link--accent" : ""}${
+                        item.current ? " site-nav__link--current" : ""
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
                 </nav>
               </div>
             </div>

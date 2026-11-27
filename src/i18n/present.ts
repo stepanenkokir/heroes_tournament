@@ -1,24 +1,9 @@
-import type { DomainId } from "@/domain/types";
+import type { DomainId, TieBreakKey } from "@/domain";
 import { HERO_COPY, TOURNAMENT_COPY, type NamedCopy, type SkillText, type TitledCopy } from "./content/catalog";
 import { SKILL_COPY } from "./content/skills";
 import { getMessages } from "./dictionaries";
 import { fill, ordinalPlace, type Locale } from "./locale";
 import type { Messages } from "./messages";
-
-const TIE_NOTES: Record<string, keyof Messages["tie"]> = {
-  "Выше по очкам личной встречи": "h2hPoints",
-  "Выше по разнице признания в личных встречах": "h2hDiff",
-  "Выше по общей разнице признания": "acclaimDiff",
-  "Выше по сумме признания": "acclaimFor",
-  "Выше по сумме удержания": "retention",
-  "Выше по стартовому рейтингу": "rating",
-  "Выше по жребию посева": "seed"
-};
-
-const GROUP_PLACE = /^(\d)-е место группы ([A-D])$/;
-const PAIR_WINNER = /^Победитель пары (.+)$/;
-const SEMI_WINNER = /^Победитель полуфинала (\d+)$/;
-const GROUP_LABEL = /^Группа ([A-D])$/;
 
 export function localizeHero<T extends NamedCopy & { id: string }>(hero: T, locale: Locale): T {
   if (locale === "ru") {
@@ -47,12 +32,17 @@ export function localizeTournament<T extends TitledCopy & { slug: string }>(
   return copy ? { ...tournament, ...copy } : tournament;
 }
 
-export function localizeTieBreak(note: string | null, messages: Messages): string | null {
+export function localizeTieBreak(
+  note: TieBreakKey | string | null,
+  messages: Messages
+): string | null {
   if (!note) {
     return null;
   }
-  const key = TIE_NOTES[note];
-  return key ? messages.tie[key] : note;
+  if (note in messages.tie) {
+    return messages.tie[note as TieBreakKey];
+  }
+  return note;
 }
 
 export function localizeSourceLabel(
@@ -63,24 +53,21 @@ export function localizeSourceLabel(
   if (!label) {
     return messages.common.pairWinner;
   }
-  const place = label.match(GROUP_PLACE);
-  if (place) {
+  const [kind, first = "", second = ""] = label.split(":");
+  if (kind === "groupPlace" && first && second) {
     return fill(messages.source.groupPlace, {
-      place: ordinalPlace(Number(place[1]), locale),
-      group: place[2] ?? ""
+      place: ordinalPlace(Number(first), locale),
+      group: second
     });
   }
-  const pair = label.match(PAIR_WINNER);
-  if (pair) {
-    return fill(messages.source.pairWinner, { pair: pair[1] ?? "" });
+  if (kind === "pairWinner" && first) {
+    return fill(messages.source.pairWinner, { pair: first });
   }
-  const semi = label.match(SEMI_WINNER);
-  if (semi) {
-    return fill(messages.source.semiWinner, { n: semi[1] ?? "" });
+  if (kind === "semiWinner" && first) {
+    return fill(messages.source.semiWinner, { n: first });
   }
-  const group = label.match(GROUP_LABEL);
-  if (group) {
-    return fill(messages.common.group, { code: group[1] ?? "" });
+  if (kind === "group" && first) {
+    return fill(messages.common.group, { code: first });
   }
   return label;
 }

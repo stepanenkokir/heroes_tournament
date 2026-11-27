@@ -12,51 +12,33 @@ export const DOMAIN_ORDER: readonly DomainId[] = [
 export const DOMAIN_META: Record<DomainId, DomainMeta> = {
   reason: {
     id: "reason",
-    title: "Разум",
-    shortTitle: "Разум",
     beats: "word",
-    losesTo: "honor",
-    ruleText: "Разум гасит Слово строгой проверкой посылок"
+    losesTo: "honor"
   },
   word: {
     id: "word",
-    title: "Слово",
-    shortTitle: "Слово",
     beats: "heart",
-    losesTo: "reason",
-    ruleText: "Слово перехватывает Сердце точным образом и интонацией"
+    losesTo: "reason"
   },
   heart: {
     id: "heart",
-    title: "Сердце",
-    shortTitle: "Сердце",
     beats: "will",
-    losesTo: "word",
-    ruleText: "Сердце смягчает Волю сочувствием и человеческой правдой"
+    losesTo: "word"
   },
   will: {
     id: "will",
-    title: "Воля",
-    shortTitle: "Воля",
     beats: "luck",
-    losesTo: "heart",
-    ruleText: "Воля переживает Удачу выдержкой на длинной дистанции"
+    losesTo: "heart"
   },
   luck: {
     id: "luck",
-    title: "Удача",
-    shortTitle: "Удача",
     beats: "honor",
-    losesTo: "will",
-    ruleText: "Удача ломает слишком прямую Честь внезапным поворотом"
+    losesTo: "will"
   },
   honor: {
     id: "honor",
-    title: "Честь",
-    shortTitle: "Честь",
     beats: "reason",
-    losesTo: "luck",
-    ruleText: "Честь не спорит с изворотливым Разумом — она ставит прямой вопрос долга"
+    losesTo: "luck"
   }
 };
 
