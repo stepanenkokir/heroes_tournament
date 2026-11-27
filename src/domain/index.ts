@@ -6,3 +6,4 @@ export * from "./elo";
 export * from "./tournament";
 export * from "./roster";
 export * from "./emblems";
+export * from "./monogram";

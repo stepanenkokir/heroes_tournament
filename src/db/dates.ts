@@ -40,6 +40,21 @@ const MONTHS_RU = [
   "декабря"
 ] as const;
 
+export function formatLocaleDate(
+  isoDate: string,
+  locale: "en" | "es" | "ru",
+  style: "long" | "short"
+): string {
+  const [y, m, d] = isoDate.split("-").map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: "UTC",
+    day: "numeric",
+    month: "long",
+    ...(style === "long" ? { year: "numeric" as const } : {})
+  }).format(date);
+}
+
 export function formatRussianDate(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number) as [number, number, number];
   const monthName = MONTHS_RU[(m - 1) % 12] ?? "";

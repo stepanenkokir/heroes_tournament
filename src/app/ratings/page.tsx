@@ -1,39 +1,47 @@
 import Link from "next/link";
 import { HeroEmblem } from "@/components/HeroEmblem";
 import { getRatingsLeaderboardView } from "@/db/queries";
+import { getMessages } from "@/i18n/dictionaries";
+import { fill } from "@/i18n/locale";
+import { localizeHero } from "@/i18n/present";
+import { getLocale } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
-export default function RatingsLeaderboardPage() {
+export default async function RatingsLeaderboardPage() {
+  const locale = await getLocale();
+  const messages = getMessages(locale);
   const { rows, verification } = getRatingsLeaderboardView();
 
   return (
     <div>
       <section className="page-hero">
         <div className="page-hero__top-bar">
-          <span className="page-hero__kicker">Непрерывный реестр Эло</span>
+          <span className="page-hero__kicker">{messages.ratings.kicker}</span>
           <span className="page-hero__dates">
-            Стартовый рейтинг: {verification.initialRating} · Пруфов в базе:{" "}
-            {verification.totalEvents}
+            {fill(messages.ratings.dates, {
+              initial: verification.initialRating,
+              count: verification.totalEvents
+            })}
           </span>
         </div>
-        <h1 className="page-hero__title">Таблица рейтинга всех героев с пруфами</h1>
-        <p className="page-hero__subtitle">
-          Каждое изменение рейтинга подкреплено ссылкой на протокол конкретного диспута. Кликните на
-          героя, чтобы открыть полный хронологический журнал его выступлений от первого кубка до
-          сегодняшнего дня.
-        </p>
+        <h1 className="page-hero__title">{messages.ratings.title}</h1>
+        <p className="page-hero__subtitle">{messages.ratings.subtitle}</p>
       </section>
 
       <div className="verification-banner">
         <div>
-          <strong>Автоматическая сверка журнала:</strong>{" "}
+          <strong>{messages.ratings.verifyLabel}</strong>{" "}
           {verification.valid
-            ? `Все ${rows.length} рейтингов героев точно сходятся при полном пересчёте ${verification.totalEvents} событий от стартовых ${verification.initialRating} пунктов.`
-            : "Обнаружено расхождение в журнале рейтинга."}
+            ? fill(messages.ratings.verifyOk, {
+                heroes: rows.length,
+                events: verification.totalEvents,
+                initial: verification.initialRating
+              })
+            : messages.ratings.verifyBad}
         </div>
         <Link href="/rules" className="btn-secondary">
-          Как устроена формула Эло (K = 20 / 28 / 36) →
+          {messages.ratings.howElo}
         </Link>
       </div>
 
@@ -42,117 +50,128 @@ export default function RatingsLeaderboardPage() {
           <table className="standings-table tabular-nums">
             <thead>
               <tr>
-                <th>Место</th>
-                <th style={{ textAlign: "left" }}>Герой</th>
-                <th>Текущий Эло</th>
-                <th>От 1500</th>
-                <th>Пик Эло</th>
-                <th>Кубки</th>
-                <th>Диспутов</th>
-                <th>В · Н · П</th>
-                <th>Последние 5 пруфов (клик → протокол)</th>
-                <th>Журнал</th>
+                <th>{messages.ratings.place}</th>
+                <th style={{ textAlign: "left" }}>{messages.ratings.hero}</th>
+                <th>{messages.ratings.current}</th>
+                <th>{messages.ratings.from1500}</th>
+                <th>{messages.ratings.peak}</th>
+                <th>{messages.ratings.cups}</th>
+                <th>{messages.ratings.disputes}</th>
+                <th>{messages.ratings.wdl}</th>
+                <th>{messages.ratings.lastFive}</th>
+                <th>{messages.ratings.journal}</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.hero.id}>
-                  <td className="standings-table__rank">#{r.rank}</td>
-                  <td className="standings-table__hero-cell">
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                      <HeroEmblem
-                        emblemKey={r.hero.emblemKey}
-                        accentHex={r.hero.accentHex}
-                        name={r.hero.name}
-                        size="sm"
-                      />
-                      <div>
-                        <Link
-                          href={`/heroes/${r.hero.slug}`}
-                          className="standings-table__hero-link"
-                          style={{ fontSize: "1.02rem" }}
-                        >
-                          {r.hero.name}
-                        </Link>
-                        <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>
-                          {r.hero.origin} · {r.hero.epithet}
+              {rows.map((row) => {
+                const hero = localizeHero(row.hero, locale);
+                return (
+                  <tr key={hero.id}>
+                    <td className="standings-table__rank">#{row.rank}</td>
+                    <td className="standings-table__hero-cell">
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <HeroEmblem
+                          emblemKey={hero.emblemKey}
+                          accentHex={hero.accentHex}
+                          name={hero.name}
+                          size="sm"
+                        />
+                        <div>
+                          <Link
+                            href={`/heroes/${hero.slug}`}
+                            className="standings-table__hero-link"
+                            style={{ fontSize: "1.02rem" }}
+                          >
+                            {hero.name}
+                          </Link>
+                          <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>
+                            {hero.origin} · {hero.epithet}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td
-                    style={{
-                      fontFamily: "var(--font-serif)",
-                      fontSize: "1.2rem",
-                      fontWeight: 700,
-                      color: "var(--ink)"
-                    }}
-                  >
-                    {r.hero.currentRating}
-                  </td>
-                  <td>
-                    <span
-                      className={
-                        r.netDelta > 0
-                          ? "delta-positive"
-                          : r.netDelta < 0
-                            ? "delta-negative"
-                            : "delta-neutral"
-                      }
+                    </td>
+                    <td
+                      style={{
+                        fontFamily: "var(--font-serif)",
+                        fontSize: "1.2rem",
+                        fontWeight: 700,
+                        color: "var(--ink)"
+                      }}
                     >
-                      {r.netDelta > 0 ? `+${r.netDelta}` : r.netDelta}
-                    </span>
-                  </td>
-                  <td>{r.peakRating}</td>
-                  <td>
-                    {r.hero.trophiesCount > 0 ? (
+                      {hero.currentRating}
+                    </td>
+                    <td>
                       <span
-                        style={{
-                          background: "var(--gold-soft)",
-                          color: "var(--gold-seal)",
-                          padding: "0.18rem 0.5rem",
-                          borderRadius: "999px",
-                          fontWeight: 700,
-                          fontSize: "0.78rem"
-                        }}
+                        className={
+                          row.netDelta > 0
+                            ? "delta-positive"
+                            : row.netDelta < 0
+                              ? "delta-negative"
+                              : "delta-neutral"
+                        }
                       >
-                        {r.hero.trophiesCount}× Кубок
+                        {row.netDelta > 0 ? `+${row.netDelta}` : row.netDelta}
                       </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>{r.hero.matchesPlayed}</td>
-                  <td>
-                    {r.hero.wins} · {r.hero.draws} · {r.hero.losses}
-                  </td>
-                  <td>
-                    <div className="proof-chips">
-                      {r.lastFive.map(({ event, opponent }) => (
-                        <Link
-                          key={event.id}
-                          href={`/disputes/${encodeURIComponent(event.disputeId)}`}
-                          className={`proof-chip ${
-                            event.delta > 0
-                              ? "delta-positive"
-                              : event.delta < 0
-                                ? "delta-negative"
-                                : "delta-neutral"
-                          }`}
-                          title={`${event.scheduledDate}: против ${opponent.name} (${event.ratingBefore} → ${event.ratingAfter})`}
+                    </td>
+                    <td>{row.peakRating}</td>
+                    <td>
+                      {hero.trophiesCount > 0 ? (
+                        <span
+                          style={{
+                            background: "var(--gold-soft)",
+                            color: "var(--gold-seal)",
+                            padding: "0.18rem 0.5rem",
+                            borderRadius: "999px",
+                            fontWeight: 700,
+                            fontSize: "0.78rem"
+                          }}
                         >
-                          {event.delta > 0 ? `+${event.delta}` : event.delta}
-                        </Link>
-                      ))}
-                    </div>
-                  </td>
-                  <td>
-                    <Link href={`/heroes/${r.hero.slug}`} className="dispute-card__link">
-                      Все {r.totalEventsCount} пруфов →
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+                          {fill(messages.ratings.trophy, { count: hero.trophiesCount })}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>{hero.matchesPlayed}</td>
+                    <td>
+                      {hero.wins} · {hero.draws} · {hero.losses}
+                    </td>
+                    <td>
+                      <div className="proof-chips">
+                        {row.lastFive.map(({ event, opponent }) => {
+                          const rival = localizeHero(opponent, locale);
+                          return (
+                            <Link
+                              key={event.id}
+                              href={`/disputes/${encodeURIComponent(event.disputeId)}`}
+                              className={`proof-chip ${
+                                event.delta > 0
+                                  ? "delta-positive"
+                                  : event.delta < 0
+                                    ? "delta-negative"
+                                    : "delta-neutral"
+                              }`}
+                              title={fill(messages.ratings.proofTitle, {
+                                date: event.scheduledDate,
+                                name: rival.name,
+                                before: event.ratingBefore,
+                                after: event.ratingAfter
+                              })}
+                            >
+                              {event.delta > 0 ? `+${event.delta}` : event.delta}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </td>
+                    <td>
+                      <Link href={`/heroes/${hero.slug}`} className="dispute-card__link">
+                        {fill(messages.ratings.allProofs, { count: row.totalEventsCount })}
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

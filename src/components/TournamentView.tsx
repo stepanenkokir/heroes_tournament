@@ -2,58 +2,104 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { formatRussianDate, formatShortRussianDate } from "@/db/dates";
+import { formatLocaleDate } from "@/db/dates";
 import type { TournamentFullView } from "@/db/queries";
+import { getMessages } from "@/i18n/dictionaries";
+import { useLocale } from "@/i18n/locale-context";
+import { fill, formatEdition } from "@/i18n/locale";
+import { dayStageLabel, localizeHero, localizeTieBreak, localizeTournament } from "@/i18n/present";
 import { DisputeCard } from "./DisputeCard";
 import { HeroEmblem } from "./HeroEmblem";
+
+const STANDING_SHORT = {
+  en: {
+    pot: "Pot",
+    played: "P",
+    wins: "W",
+    draws: "D",
+    losses: "L",
+    acclaim: "Acc.",
+    diff: "±",
+    retention: "Ret.",
+    points: "Pts"
+  },
+  es: {
+    pot: "Bom.",
+    played: "J",
+    wins: "G",
+    draws: "E",
+    losses: "P",
+    acclaim: "Rec.",
+    diff: "±",
+    retention: "Ret.",
+    points: "Pts"
+  },
+  ru: {
+    pot: "Корз.",
+    played: "И",
+    wins: "В",
+    draws: "Н",
+    losses: "П",
+    acclaim: "Призн.",
+    diff: "±",
+    retention: "Удерж.",
+    points: "Очки"
+  }
+} as const;
 
 interface TournamentViewProps {
   data: TournamentFullView;
   allTournaments: Array<{
     slug: string;
     title: string;
+    subtitle: string;
     editionNumber: number;
     status: string;
   }>;
 }
 
 export function TournamentView({ data, allTournaments }: TournamentViewProps) {
-  const { tournament, champion, runnerUp, groups, playoffs, days } = data;
+  const locale = useLocale();
+  const messages = getMessages(locale);
+  const tournament = localizeTournament(data.tournament, locale);
+  const champion = data.champion ? localizeHero(data.champion, locale) : null;
+  const runnerUp = data.runnerUp ? localizeHero(data.runnerUp, locale) : null;
+  const { groups, playoffs, days } = data;
   const [groupSliceMode, setGroupSliceMode] = useState<"current" | "day1_empty">("current");
-  const todayDay = days.find((d) => d.isToday);
+  const todayDay = days.find((day) => day.isToday);
   const [selectedDayOffset, setSelectedDayOffset] = useState<number | "all">(
     todayDay ? todayDay.dayOffset : "all"
   );
 
   const visibleDays =
-    selectedDayOffset === "all"
-      ? days
-      : days.filter((d) => d.dayOffset === selectedDayOffset);
+    selectedDayOffset === "all" ? days : days.filter((day) => day.dayOffset === selectedDayOffset);
+  const editions = allTournaments.map((item) => localizeTournament(item, locale));
 
   return (
     <div className="tournament-view">
       <section className="page-hero">
         <div className="page-hero__top-bar">
           <div className="edition-switcher">
-            {allTournaments.map((t) => {
-              const isCurrent = t.slug === tournament.slug;
-              const href = t.status === "active" ? "/tournament" : `/tournaments/${t.slug}`;
+            {editions.map((item) => {
+              const isCurrent = item.slug === tournament.slug;
+              const href = item.status === "active" ? "/tournament" : `/tournaments/${item.slug}`;
               return (
                 <Link
-                  key={t.slug}
+                  key={item.slug}
                   href={href}
                   className={`edition-pill ${isCurrent ? "edition-pill--active" : ""}`}
                 >
-                  <span>{t.editionNumber}-й созыв</span>
+                  <span>{formatEdition(item.editionNumber, locale)}</span>
                   <span className="edition-pill__status">
-                    {t.status === "active" ? "Идёт сейчас" : "Архив"}
+                    {item.status === "active" ? messages.status.active : messages.status.archive}
                   </span>
                 </Link>
               );
             })}
           </div>
           <span className="page-hero__dates">
-            {formatRussianDate(tournament.startDate)} — {formatRussianDate(tournament.endDate)}
+            {formatLocaleDate(tournament.startDate, locale, "long")} —{" "}
+            {formatLocaleDate(tournament.endDate, locale, "long")}
           </span>
         </div>
 
@@ -70,7 +116,7 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
                 size="md"
               />
               <div>
-                <div className="champion-banner__label">Триумфатор Кубка</div>
+                <div className="champion-banner__label">{messages.cup.champion}</div>
                 <Link href={`/heroes/${champion.slug}`} className="champion-banner__name">
                   {champion.name}
                 </Link>
@@ -85,7 +131,7 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
                 size="sm"
               />
               <div>
-                <div className="champion-banner__label">Серебряный диспутант</div>
+                <div className="champion-banner__label">{messages.cup.runnerUp}</div>
                 <Link href={`/heroes/${runnerUp.slug}`} className="champion-banner__name">
                   {runnerUp.name}
                 </Link>
@@ -94,9 +140,7 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
           </div>
         ) : (
           <div className="active-cup-notice">
-            <strong>Регламент дня (Europe/Moscow):</strong> в групповом туре каждый день
-            открывается по одному диспуту в каждой из четырёх групп. Анонсированные навыки открыты
-            весь день, а итог засчитывается на следующие сутки.
+            <strong>{messages.cup.dayNotice}</strong>
           </div>
         )}
       </section>
@@ -104,13 +148,10 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
       <section className="section-block">
         <div className="section-header">
           <div>
-            <h2 className="section-title">Групповой этап · Четыре группы по четыре героя</h2>
-            <p className="section-subtitle">
-              Победа — 3 очка, ничья — 1, поражение — 0. В плей-офф выходят 1-е и 2-е места каждой
-              группы.
-            </p>
+            <h2 className="section-title">{messages.cup.groupsTitle}</h2>
+            <p className="section-subtitle">{messages.cup.groupsSubtitle}</p>
           </div>
-          <div className="segmented-control" role="group" aria-label="Срез таблицы групп">
+          <div className="segmented-control" role="group" aria-label={messages.cup.sliceAria}>
             <button
               type="button"
               className={`segmented-control__btn ${
@@ -118,7 +159,7 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
               }`}
               onClick={() => setGroupSliceMode("current")}
             >
-              Актуальная таблица
+              {messages.cup.tableCurrent}
             </button>
             <button
               type="button"
@@ -127,7 +168,7 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
               }`}
               onClick={() => setGroupSliceMode("day1_empty")}
             >
-              На старте (День 1 · 0 сыграно)
+              {messages.cup.tableStart}
             </button>
           </div>
         </div>
@@ -151,18 +192,18 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
                       acclaimDiff: 0,
                       retentionFor: 0,
                       qualified: idx < 2,
-                      tieBreakNote: "Посев по корзинам жеребьёвки до начала игр"
+                      tieBreakNote: messages.cup.potSeedNote
                     }))
                 : group.standings;
 
             return (
               <div key={group.groupCode} className="group-card">
                 <div className="group-card__header">
-                  <h3 className="group-card__title">{group.title}</h3>
+                  <h3 className="group-card__title">
+                    {fill(messages.common.group, { code: group.groupCode })}
+                  </h3>
                   <span className="group-card__caption">
-                    {groupSliceMode === "day1_empty"
-                      ? "Состояние после жеребьёвки корзин"
-                      : "Квалификация: места 1–2"}
+                    {groupSliceMode === "day1_empty" ? messages.cup.afterDraw : messages.cup.qualify}
                   </span>
                 </div>
 
@@ -171,79 +212,97 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
                     <thead>
                       <tr>
                         <th>#</th>
-                        <th>Герой</th>
-                        <th title="Корзина жеребьёвки">Корз.</th>
-                        <th title="Сыграно диспутов">И</th>
-                        <th title="Победы">В</th>
-                        <th title="Ничьи">Н</th>
-                        <th title="Поражения">П</th>
-                        <th title="Признание (за — против)">Призн.</th>
-                        <th title="Разница признания">±</th>
-                        <th title="Сумма удержания">Удерж.</th>
-                        <th title="Очки группы">Очки</th>
+                        <th>{messages.cup.hero}</th>
+                        {(
+                          [
+                            ["pot", messages.cup.colPot],
+                            ["played", messages.cup.colPlayed],
+                            ["wins", messages.cup.colWins],
+                            ["draws", messages.cup.colDraws],
+                            ["losses", messages.cup.colLosses],
+                            ["acclaim", messages.cup.colAcclaim],
+                            ["diff", messages.cup.colDiff],
+                            ["retention", messages.cup.colRetention],
+                            ["points", messages.cup.colPoints]
+                          ] as const
+                        ).map(([key, title]) => (
+                          <th key={key} title={title}>
+                            {STANDING_SHORT[locale][key]}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {displayRows.map((row) => (
-                        <tr
-                          key={row.heroId}
-                          className={row.qualified ? "standings-table__row--qualified" : ""}
-                        >
-                          <td className="standings-table__rank">{row.rank}</td>
-                          <td className="standings-table__hero-cell">
-                            <div className="standings-table__hero-wrap">
-                              <Link
-                                href={`/heroes/${row.hero.slug}`}
-                                className="standings-table__hero-link"
-                              >
-                                {row.hero.name}
-                              </Link>
-                              {row.tieBreakNote && groupSliceMode === "current" ? (
-                                <span className="standings-table__tiebreak">{row.tieBreakNote}</span>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td>{row.potNumber}</td>
-                          <td>{row.played}</td>
-                          <td>{row.wins}</td>
-                          <td>{row.draws}</td>
-                          <td>{row.losses}</td>
-                          <td>
-                            {row.acclaimFor}–{row.acclaimAgainst}
-                          </td>
-                          <td>{row.acclaimDiff > 0 ? `+${row.acclaimDiff}` : row.acclaimDiff}</td>
-                          <td>{row.retentionFor}</td>
-                          <td className="standings-table__points">{row.points}</td>
-                        </tr>
-                      ))}
+                      {displayRows.map((row) => {
+                        const hero = localizeHero(row.hero, locale);
+                        const note =
+                          groupSliceMode === "current"
+                            ? localizeTieBreak(row.tieBreakNote, messages)
+                            : row.tieBreakNote;
+                        return (
+                          <tr
+                            key={row.heroId}
+                            className={row.qualified ? "standings-table__row--qualified" : ""}
+                          >
+                            <td className="standings-table__rank">{row.rank}</td>
+                            <td className="standings-table__hero-cell">
+                              <div className="standings-table__hero-wrap">
+                                <Link
+                                  href={`/heroes/${hero.slug}`}
+                                  className="standings-table__hero-link"
+                                >
+                                  {hero.name}
+                                </Link>
+                                {note ? <span className="standings-table__tiebreak">{note}</span> : null}
+                              </div>
+                            </td>
+                            <td>{row.potNumber}</td>
+                            <td>{row.played}</td>
+                            <td>{row.wins}</td>
+                            <td>{row.draws}</td>
+                            <td>{row.losses}</td>
+                            <td>
+                              {row.acclaimFor}–{row.acclaimAgainst}
+                            </td>
+                            <td>{row.acclaimDiff > 0 ? `+${row.acclaimDiff}` : row.acclaimDiff}</td>
+                            <td>{row.retentionFor}</td>
+                            <td className="standings-table__points">{row.points}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
 
                 <details className="group-card__matches-drawer">
-                  <summary>Матчи группы {group.groupCode} (6 диспутов)</summary>
+                  <summary>{fill(messages.cup.matches, { code: group.groupCode })}</summary>
                   <div className="group-card__mini-list">
-                    {group.disputes.map((c) => (
-                      <Link
-                        key={c.dispute.id}
-                        href={`/disputes/${encodeURIComponent(c.dispute.id)}`}
-                        className="group-mini-match"
-                      >
-                        <span className="group-mini-match__date">
-                          Д{c.dispute.dayOffset + 1} · {formatShortRussianDate(c.dispute.scheduledDate)}
-                        </span>
-                        <span className="group-mini-match__names">
-                          {c.heroA?.name} — {c.heroB?.name}
-                        </span>
-                        <span className="group-mini-match__score tabular-nums">
-                          {c.dispute.status === "completed"
-                            ? `${c.dispute.acclaimA}:${c.dispute.acclaimB}`
-                            : c.dispute.status === "announced"
-                              ? "Анонс"
-                              : "Расписание"}
-                        </span>
-                      </Link>
-                    ))}
+                    {group.disputes.map((card) => {
+                      const sideA = card.heroA ? localizeHero(card.heroA, locale) : null;
+                      const sideB = card.heroB ? localizeHero(card.heroB, locale) : null;
+                      return (
+                        <Link
+                          key={card.dispute.id}
+                          href={`/disputes/${encodeURIComponent(card.dispute.id)}`}
+                          className="group-mini-match"
+                        >
+                          <span className="group-mini-match__date">
+                            {fill(messages.common.dayShort, { n: card.dispute.dayOffset + 1 })} ·{" "}
+                            {formatLocaleDate(card.dispute.scheduledDate, locale, "short")}
+                          </span>
+                          <span className="group-mini-match__names">
+                            {sideA?.name} — {sideB?.name}
+                          </span>
+                          <span className="group-mini-match__score tabular-nums">
+                            {card.dispute.status === "completed"
+                              ? `${card.dispute.acclaimA}:${card.dispute.acclaimB}`
+                              : card.dispute.status === "announced"
+                                ? messages.cup.announced
+                                : messages.cup.scheduled}
+                          </span>
+                        </Link>
+                      );
+                    })}
                   </div>
                 </details>
               </div>
@@ -255,52 +314,36 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
       <section className="section-block">
         <div className="section-header">
           <div>
-            <h2 className="section-title">Сетка плей-офф · Четвертьфиналы, полуфиналы и финал</h2>
-            <p className="section-subtitle">
-              Пары 1A–2B, 1B–2A, 1C–2D, 1D–2C. Ничья исключена: вскрывается 3-я запечатанная пара,
-              затем решающие доводы (признание ≥ 12) и Жребий славы.
-            </p>
+            <h2 className="section-title">{messages.cup.bracketTitle}</h2>
+            <p className="section-subtitle">{messages.cup.bracketSubtitle}</p>
           </div>
         </div>
 
         <div className="bracket-columns">
-          <div className="bracket-column">
-            <h3 className="bracket-column__title">Четвертьфиналы (Дни 7–10)</h3>
-            {playoffs
-              .filter((p) => p.card.dispute.stage === "qf")
-              .map((p) => (
-                <DisputeCard key={p.card.dispute.id} card={p.card} />
-              ))}
-          </div>
-
-          <div className="bracket-column">
-            <h3 className="bracket-column__title">Полуфиналы (Дни 11–12)</h3>
-            {playoffs
-              .filter((p) => p.card.dispute.stage === "sf")
-              .map((p) => (
-                <DisputeCard key={p.card.dispute.id} card={p.card} />
-              ))}
-          </div>
-
-          <div className="bracket-column">
-            <h3 className="bracket-column__title">Финал Кубка (День 13)</h3>
-            {playoffs
-              .filter((p) => p.card.dispute.stage === "final")
-              .map((p) => (
-                <DisputeCard key={p.card.dispute.id} card={p.card} />
-              ))}
-          </div>
+          {(
+            [
+              ["qf", messages.stage.qfDays],
+              ["sf", messages.stage.sfDays],
+              ["final", messages.stage.finalDay]
+            ] as const
+          ).map(([stage, title]) => (
+            <div key={stage} className="bracket-column">
+              <h3 className="bracket-column__title">{title}</h3>
+              {playoffs
+                .filter((item) => item.card.dispute.stage === stage)
+                .map((item) => (
+                  <DisputeCard key={item.card.dispute.id} card={item.card} />
+                ))}
+            </div>
+          ))}
         </div>
       </section>
 
       <section className="section-block">
         <div className="section-header">
           <div>
-            <h2 className="section-title">Календарь кубка по дням (13 игровых дней)</h2>
-            <p className="section-subtitle">
-              Дни 1–6: по одному диспуту в каждой группе (4 в день). Дни 7–13: по одному диспуту
-              плей-офф в день.
-            </p>
+            <h2 className="section-title">{messages.cup.calendarTitle}</h2>
+            <p className="section-subtitle">{messages.cup.calendarSubtitle}</p>
           </div>
         </div>
 
@@ -310,19 +353,19 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
             className={`day-chip ${selectedDayOffset === "all" ? "day-chip--active" : ""}`}
             onClick={() => setSelectedDayOffset("all")}
           >
-            Все 13 дней
+            {messages.cup.allDays}
           </button>
-          {days.map((d) => (
+          {days.map((day) => (
             <button
-              key={d.dayOffset}
+              key={day.dayOffset}
               type="button"
               className={`day-chip ${
-                selectedDayOffset === d.dayOffset ? "day-chip--active" : ""
-              } ${d.isToday ? "day-chip--today" : ""}`}
-              onClick={() => setSelectedDayOffset(d.dayOffset)}
+                selectedDayOffset === day.dayOffset ? "day-chip--active" : ""
+              } ${day.isToday ? "day-chip--today" : ""}`}
+              onClick={() => setSelectedDayOffset(day.dayOffset)}
             >
-              <span>День {d.dayNumber}</span>
-              <small>{formatShortRussianDate(d.scheduledDate)}</small>
+              <span>{fill(messages.common.day, { n: day.dayNumber })}</span>
+              <small>{formatLocaleDate(day.scheduledDate, locale, "short")}</small>
             </button>
           ))}
         </div>
@@ -332,21 +375,19 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
             <div key={day.dayOffset} className="day-panel">
               <div className="day-panel__header">
                 <div>
-                  <span className="day-panel__number">День {day.dayNumber}</span>
-                  <strong className="day-panel__stage">{day.stageLabel}</strong>
+                  <span className="day-panel__number">
+                    {fill(messages.common.day, { n: day.dayNumber })}
+                  </span>
+                  <strong className="day-panel__stage">{dayStageLabel(day.dayOffset, messages)}</strong>
                 </div>
                 <div className="day-panel__date">
-                  {day.isToday ? <span className="today-badge">Сегодня на арене</span> : null}
-                  <span>{formatRussianDate(day.scheduledDate)}</span>
+                  {day.isToday ? <span className="today-badge">{messages.cup.todayBadge}</span> : null}
+                  <span>{formatLocaleDate(day.scheduledDate, locale, "long")}</span>
                 </div>
               </div>
               <div className="day-panel__cards">
                 {day.disputes.map((card) => (
-                  <DisputeCard
-                    key={card.dispute.id}
-                    card={card}
-                    expandedAnnouncement={day.isToday}
-                  />
+                  <DisputeCard key={card.dispute.id} card={card} expandedAnnouncement={day.isToday} />
                 ))}
               </div>
             </div>

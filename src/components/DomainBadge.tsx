@@ -1,4 +1,9 @@
+"use client";
+
 import { DOMAIN_META, type DomainId } from "@/domain";
+import { getMessages } from "@/i18n/dictionaries";
+import { useLocale } from "@/i18n/locale-context";
+import { fill } from "@/i18n/locale";
 
 interface DomainBadgeProps {
   domain: DomainId | string;
@@ -6,16 +11,18 @@ interface DomainBadgeProps {
 }
 
 export function DomainBadge({ domain, compact = false }: DomainBadgeProps) {
+  const messages = getMessages(useLocale());
   const meta = DOMAIN_META[domain as DomainId] ?? DOMAIN_META.reason;
-  const beatsMeta = DOMAIN_META[meta.beats];
+  const copy = messages.domains[meta.id];
+  const beats = messages.domains[meta.beats];
 
   return (
     <span
       className={`domain-badge domain-badge--${meta.id} ${compact ? "domain-badge--compact" : ""}`}
-      title={`${meta.title}: ${meta.ruleText} (одолевает домен «${beatsMeta.title}»)`}
+      title={`${copy.title}: ${copy.rule} (${fill(messages.domainBeats, { name: beats.title })})`}
     >
       <span className="domain-badge__dot" />
-      <span>{meta.title}</span>
+      <span>{copy.title}</span>
     </span>
   );
 }

@@ -2,8 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DomainBadge } from "@/components/DomainBadge";
 import { HeroEmblem } from "@/components/HeroEmblem";
-import { formatShortRussianDate } from "@/db/dates";
-import { getHeroProfileView, getStageRussianLabel } from "@/db/queries";
+import { formatLocaleDate } from "@/db/dates";
+import { getHeroProfileView } from "@/db/queries";
+import { getMessages } from "@/i18n/dictionaries";
+import { fill, formatCupEdition } from "@/i18n/locale";
+import { localizeHero, localizeSkill, localizeTournament, stageLabel } from "@/i18n/present";
+import { getLocale } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +16,8 @@ export default async function HeroProfilePage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  const locale = await getLocale();
+  const messages = getMessages(locale);
   const { slug } = await params;
   const data = getHeroProfileView(slug);
 
@@ -19,17 +25,20 @@ export default async function HeroProfilePage({
     notFound();
   }
 
-  const { hero, rank, dominants, appeals, ledger, activeDisputes } = data;
+  const hero = localizeHero(data.hero, locale);
+  const { rank, ledger, activeDisputes } = data;
+  const dominants = data.dominants.map((skill) => localizeSkill(skill, locale));
+  const appeals = data.appeals.map((skill) => localizeSkill(skill, locale));
 
   return (
     <div>
       <section className="page-hero">
         <div className="page-hero__top-bar">
           <Link href="/ratings" className="btn-secondary">
-            ← Ко всем героям и рейтингу
+            {messages.hero.back}
           </Link>
           <span className="page-hero__kicker">
-            #{rank} в рейтинге Эло · {hero.origin}
+            {fill(messages.hero.rank, { rank, origin: hero.origin })}
           </span>
         </div>
 
@@ -44,12 +53,7 @@ export default async function HeroProfilePage({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
-            <HeroEmblem
-              emblemKey={hero.emblemKey}
-              accentHex={hero.accentHex}
-              name={hero.name}
-              size="lg"
-            />
+            <HeroEmblem emblemKey={hero.emblemKey} accentHex={hero.accentHex} name={hero.name} size="lg" />
             <div>
               <h1 className="page-hero__title" style={{ marginBottom: "0.25rem" }}>
                 {hero.name}
@@ -70,7 +74,7 @@ export default async function HeroProfilePage({
             }}
           >
             <div>
-              <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)" }}>Рейтинг Эло</div>
+              <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)" }}>{messages.hero.elo}</div>
               <div
                 style={{
                   fontFamily: "var(--font-serif)",
@@ -83,17 +87,17 @@ export default async function HeroProfilePage({
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)" }}>Диспуты</div>
+              <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)" }}>{messages.hero.disputes}</div>
               <div style={{ fontSize: "1.25rem", fontWeight: 700 }}>{hero.matchesPlayed}</div>
             </div>
             <div>
-              <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)" }}>В · Н · П</div>
+              <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)" }}>{messages.hero.wdl}</div>
               <div style={{ fontSize: "1.25rem", fontWeight: 700 }}>
                 {hero.wins} · {hero.draws} · {hero.losses}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)" }}>Кубки</div>
+              <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)" }}>{messages.hero.cups}</div>
               <div style={{ fontSize: "1.25rem", fontWeight: 700 }}>{hero.trophiesCount}</div>
             </div>
           </div>
@@ -101,12 +105,12 @@ export default async function HeroProfilePage({
 
         {activeDisputes.length > 0 ? (
           <div className="active-cup-notice">
-            Сегодня герой участвует в анонсированном диспуте:{" "}
+            {messages.hero.today}{" "}
             <Link
               href={`/disputes/${encodeURIComponent(activeDisputes[0]!.id)}`}
               style={{ fontWeight: 700, textDecoration: "underline" }}
             >
-              открыть карточку сегодняшнего анонса →
+              {messages.hero.openToday}
             </Link>
           </div>
         ) : null}
@@ -115,11 +119,8 @@ export default async function HeroProfilePage({
       <section className="section-block">
         <div className="section-header">
           <div>
-            <h2 className="section-title">Арсенал диспутанта: 5 доминант и 5 апелляций</h2>
-            <p className="section-subtitle">
-              Перед каждым состязанием жребий выбирает 2 открытых навыка каждого рода и 1
-              запечатанный на случай овертайма в плей-офф.
-            </p>
+            <h2 className="section-title">{messages.hero.arsenalTitle}</h2>
+            <p className="section-subtitle">{messages.hero.arsenalSubtitle}</p>
           </div>
         </div>
 
@@ -127,10 +128,10 @@ export default async function HeroProfilePage({
           <div className="group-card">
             <div className="group-card__header">
               <h3 className="group-card__title" style={{ color: "var(--cinnabar)" }}>
-                5 Доминант (чем давит в споре)
+                {messages.hero.dominantsTitle}
               </h3>
               <span className="group-card__caption" style={{ color: "var(--cinnabar)" }}>
-                Острота и Глубина
+                {messages.hero.sharpDepth}
               </span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -151,8 +152,12 @@ export default async function HeroProfilePage({
                   </div>
                   <p className="skill-box__desc">{skill.description}</p>
                   <div className="skill-box__footer tabular-nums">
-                    <span>Острота: {skill.primaryStat}</span>
-                    <span>Глубина: {skill.secondaryStat}</span>
+                    <span>
+                      {messages.common.sharpness}: {skill.primaryStat}
+                    </span>
+                    <span>
+                      {messages.common.depth}: {skill.secondaryStat}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -162,9 +167,9 @@ export default async function HeroProfilePage({
           <div className="group-card">
             <div className="group-card__header">
               <h3 className="group-card__title" style={{ color: "var(--turquoise)" }}>
-                5 Апелляций (к чему взывает в ответ)
+                {messages.hero.appealsTitle}
               </h3>
-              <span className="group-card__caption">Твёрдость и Находчивость</span>
+              <span className="group-card__caption">{messages.hero.firmWit}</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {appeals.map((skill) => (
@@ -184,8 +189,12 @@ export default async function HeroProfilePage({
                   </div>
                   <p className="skill-box__desc">{skill.description}</p>
                   <div className="skill-box__footer tabular-nums">
-                    <span>Твёрдость: {skill.primaryStat}</span>
-                    <span>Находчивость: {skill.secondaryStat}</span>
+                    <span>
+                      {messages.common.firmness}: {skill.primaryStat}
+                    </span>
+                    <span>
+                      {messages.common.wit}: {skill.secondaryStat}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -197,13 +206,8 @@ export default async function HeroProfilePage({
       <section className="section-block">
         <div className="section-header">
           <div>
-            <h2 className="section-title">
-              Пруфы рейтинга: полный журнал ({ledger.length} завершённых диспутов)
-            </h2>
-            <p className="section-subtitle">
-              Каждая запись хранит рейтинг до начала встречи, математическое ожидание E, коэффициент
-              стадии K, дельту и прямую ссылку на протокол.
-            </p>
+            <h2 className="section-title">{fill(messages.hero.ledgerTitle, { count: ledger.length })}</h2>
+            <p className="section-subtitle">{messages.hero.ledgerSubtitle}</p>
           </div>
         </div>
 
@@ -213,53 +217,48 @@ export default async function HeroProfilePage({
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Дата</th>
-                  <th style={{ textAlign: "left" }}>Турнир и стадия</th>
-                  <th style={{ textAlign: "left" }}>Оппонент</th>
-                  <th>Счёт признания</th>
-                  <th>Рейтинг до</th>
-                  <th>Ожидание E</th>
+                  <th>{messages.hero.date}</th>
+                  <th style={{ textAlign: "left" }}>{messages.hero.tournamentStage}</th>
+                  <th style={{ textAlign: "left" }}>{messages.hero.opponent}</th>
+                  <th>{messages.hero.score}</th>
+                  <th>{messages.hero.ratingBefore}</th>
+                  <th>{messages.hero.expected}</th>
                   <th>K</th>
-                  <th>Дельта</th>
-                  <th>Рейтинг после</th>
-                  <th>Протокол</th>
+                  <th>{messages.hero.delta}</th>
+                  <th>{messages.hero.ratingAfter}</th>
+                  <th>{messages.hero.protocol}</th>
                 </tr>
               </thead>
               <tbody>
                 {ledger.map(({ event, opponent, tournament, dispute }) => {
+                  const rival = localizeHero(opponent, locale);
+                  const cup = localizeTournament(tournament, locale);
                   const isSideA = dispute.heroAId === hero.id;
                   const myAcclaim = isSideA ? dispute.acclaimA : dispute.acclaimB;
                   const oppAcclaim = isSideA ? dispute.acclaimB : dispute.acclaimA;
                   const outcomeBadge =
                     event.actualScore === 1
-                      ? "Победа"
+                      ? messages.hero.win
                       : event.actualScore === 0
-                        ? "Поражение"
-                        : "Ничья";
+                        ? messages.hero.loss
+                        : messages.hero.draw;
 
                   return (
                     <tr key={event.id}>
                       <td>{event.sequence}</td>
-                      <td>{formatShortRussianDate(event.scheduledDate)}</td>
+                      <td>{formatLocaleDate(event.scheduledDate, locale, "short")}</td>
                       <td style={{ textAlign: "left" }}>
                         <Link
-                          href={
-                            tournament.status === "active"
-                              ? "/tournament"
-                              : `/tournaments/${tournament.slug}`
-                          }
+                          href={cup.status === "active" ? "/tournament" : `/tournaments/${cup.slug}`}
                           style={{ fontWeight: 600 }}
                         >
-                          {tournament.editionNumber}-й кубок
+                          {formatCupEdition(cup.editionNumber, locale)}
                         </Link>{" "}
-                        · {getStageRussianLabel(event.stage, dispute.groupCode)}
+                        · {stageLabel(event.stage, dispute.groupCode, messages)}
                       </td>
                       <td style={{ textAlign: "left" }}>
-                        <Link
-                          href={`/heroes/${opponent.slug}`}
-                          className="standings-table__hero-link"
-                        >
-                          {opponent.name}
+                        <Link href={`/heroes/${rival.slug}`} className="standings-table__hero-link">
+                          {rival.name}
                         </Link>
                       </td>
                       <td>
@@ -292,7 +291,7 @@ export default async function HeroProfilePage({
                           href={`/disputes/${encodeURIComponent(dispute.id)}`}
                           className="dispute-card__link"
                         >
-                          Пруф →
+                          {messages.hero.proofLink}
                         </Link>
                       </td>
                     </tr>
