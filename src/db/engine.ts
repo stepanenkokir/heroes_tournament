@@ -1,8 +1,10 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import {
   buildGroupRoundRobinSchedule,
+  buildProtocolCommentary,
   calculateEloUpdate,
   computeGroupStandings,
+  computeVoteSnapshot,
   drawAnnouncement,
   drawGroupsByPots,
   getGroupCodes,
@@ -11,6 +13,7 @@ import {
   INITIAL_ELO_RATING,
   PLAYOFF_BLUEPRINT,
   resolvePlayoffPairings,
+  selectTournamentField,
   simulateDispute,
   verifyRatingLedger,
   type CompletedGroupMatchRecord,
@@ -20,21 +23,36 @@ import {
   type GroupAssignment,
   type GroupCode,
   type PlayoffSlotCode,
-  type SkillDrawOrder
+  type SkillDrawOrder,
+  type SkillStatKind,
+  type SkillStatModifier,
+  type TournamentFieldKind,
+  type TournamentThemeId,
+  type VoteWeight
 } from "../domain/index";
+import { localizeHero, localizeSkill } from "../i18n/present";
 import type { AppDbBundle } from "./client";
 import { addDaysIso, getMoscowTodayIso } from "./dates";
 import {
   disputeAnnouncementsTable,
+  disputeCommentariesTable,
   disputeExchangesTable,
   disputesTable,
+  disputeVoteSnapshotsTable,
+  disputeVotesTable,
   heroesTable,
+  heroSubmissionsTable,
+  oauthAccountsTable,
   ratingEventsTable,
   skillsTable,
   tournamentGroupsTable,
   tournamentParticipantsTable,
-  tournamentsTable
+  tournamentsTable,
+  userAchievementsTable,
+  usersTable
 } from "./schema";
+
+export const REPUTATION_PROPOSAL_THRESHOLD = 3;
 
 export interface TournamentEditionSpec {
   id: string;
@@ -42,12 +60,21 @@ export interface TournamentEditionSpec {
   title: string;
   subtitle: string;
   editionNumber: number;
+  fieldKind?: TournamentFieldKind;
+  themeId?: TournamentThemeId | null;
   seed: string;
   startDate: string; // YYYY-MM-DD
 }
 
 export function clearAllTables(bundle: AppDbBundle): void {
   bundle.sqlite.exec(`
+    DELETE FROM dispute_commentaries;
+    DELETE FROM hero_submissions;
+    DELETE FROM user_achievements;
+    DELETE FROM dispute_vote_snapshots;
+    DELETE FROM dispute_votes;
+    DELETE FROM oauth_accounts;
+    DELETE FROM users;
     DELETE FROM rating_events;
     DELETE FROM dispute_exchanges;
     DELETE FROM dispute_announcements;
@@ -106,13 +133,22 @@ export function createScheduledTournament(
 ): void {
   const { db } = bundle;
   const heroRows = db.select().from(heroesTable).all();
+  const fieldKind: TournamentFieldKind = spec.fieldKind ?? "open";
+  const themeId: TournamentThemeId | null = spec.themeId ?? null;
 
-  const entrants = heroRows.map((h) => ({
+  const allEntrants = heroRows.map((h) => ({
     heroId: h.id,
     entryRating: h.currentRating
   }));
 
-  const groupAssignments = drawGroupsByPots(entrants, spec.seed, 4);
+  const selectedEntrants = selectTournamentField(allEntrants, HERO_BY_ID, {
+    fieldKind,
+    themeId,
+    seed: spec.seed,
+    fieldSize: 16
+  });
+
+  const groupAssignments = drawGroupsByPots(selectedEntrants, spec.seed, 4);
   const endDate = addDaysIso(spec.startDate, 12);
 
   db.insert(tournamentsTable)
@@ -122,6 +158,8 @@ export function createScheduledTournament(
       title: spec.title,
       subtitle: spec.subtitle,
       editionNumber: spec.editionNumber,
+      fieldKind,
+      themeId,
       seed: spec.seed,
       status: "active",
       startDate: spec.startDate,
@@ -247,6 +285,338 @@ export function createScheduledTournament(
   }
 }
 
+function ensureAchievement(
+  bundle: AppDbBundle,
+  userId: string,
+  code: string,
+  earnedAt: string
+): void {
+  const id = `${userId}:ach:${code}`;
+  const existing = bundle.db
+    .select()
+    .from(userAchievementsTable)
+    .where(eq(userAchievementsTable.id, id))
+    .get();
+  if (!existing) {
+    bundle.db
+      .insert(userAchievementsTable)
+      .values({ id, userId, code, earnedAt })
+      .run();
+  }
+}
+
+export function upsertOAuthUser(
+  bundle: AppDbBundle,
+  input: {
+    provider: "telegram" | "google" | "vk";
+    providerAccountId: string;
+    handle: string;
+    displayName: string;
+    userId?: string;
+    nowIso?: string;
+  }
+): typeof usersTable.$inferSelect {
+  const { db } = bundle;
+  const nowIso = input.nowIso ?? getMoscowTodayIso();
+  const accountId = `${input.provider}:${input.providerAccountId}`;
+
+  const existingAccount = db
+    .select()
+    .from(oauthAccountsTable)
+    .where(eq(oauthAccountsTable.id, accountId))
+    .get();
+
+  if (existingAccount) {
+    const user = db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, existingAccount.userId))
+      .get();
+    if (user) {
+      return user;
+    }
+  }
+
+  let userId = input.userId ?? `user:${input.provider}:${input.providerAccountId}`;
+  let user = db.select().from(usersTable).where(eq(usersTable.id, userId)).get();
+
+  if (!user) {
+    const avatarText = input.displayName.trim().slice(0, 2).toUpperCase() || "УЧ";
+    db.insert(usersTable)
+      .values({
+        id: userId,
+        displayName: input.displayName.trim() || input.handle,
+        avatarText,
+        reputationPoints: 0,
+        winsCount: 0,
+        votesCount: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        createdAt: nowIso
+      })
+      .run();
+    user = db.select().from(usersTable).where(eq(usersTable.id, userId)).get()!;
+  }
+
+  if (existingAccount) {
+    db.update(oauthAccountsTable)
+      .set({
+        userId: user.id,
+        handle: input.handle,
+        linkedAt: nowIso
+      })
+      .where(eq(oauthAccountsTable.id, accountId))
+      .run();
+  } else {
+    db.insert(oauthAccountsTable)
+      .values({
+        id: accountId,
+        userId: user.id,
+        provider: input.provider,
+        providerAccountId: input.providerAccountId,
+        handle: input.handle,
+        linkedAt: nowIso
+      })
+      .run();
+  }
+
+  return user;
+}
+
+export function castDisputeBallot(
+  bundle: AppDbBundle,
+  input: {
+    disputeId: string;
+    userId: string;
+    heroId: string;
+    skillId: string;
+    stat: SkillStatKind;
+    weight?: VoteWeight;
+    nowIso?: string;
+  }
+): typeof disputeVotesTable.$inferSelect {
+  const { db } = bundle;
+  const nowIso = input.nowIso ?? getMoscowTodayIso();
+  const weight: VoteWeight = input.weight === 2 ? 2 : 1;
+
+  const dispute = db
+    .select()
+    .from(disputesTable)
+    .where(eq(disputesTable.id, input.disputeId))
+    .get();
+  if (!dispute) {
+    throw new Error(`Dispute ${input.disputeId} not found`);
+  }
+  if (!dispute.heroAId || !dispute.heroBId) {
+    throw new Error("Pair is not yet determined for this dispute");
+  }
+  if (dispute.status !== "scheduled") {
+    throw new Error("Voting window is already closed for this dispute");
+  }
+  if (input.heroId !== dispute.heroAId && input.heroId !== dispute.heroBId) {
+    throw new Error("Selected hero is not part of this dispute");
+  }
+
+  const heroDef = HERO_BY_ID.get(input.heroId);
+  const allHeroSkills = heroDef ? [...heroDef.dominants, ...heroDef.appeals] : [];
+  if (!allHeroSkills.some((s) => s.id === input.skillId)) {
+    throw new Error("Selected skill does not belong to the chosen hero");
+  }
+
+  const ballotId = `${input.disputeId}:vote:${input.userId}`;
+  const existing = db
+    .select()
+    .from(disputeVotesTable)
+    .where(eq(disputeVotesTable.id, ballotId))
+    .get();
+
+  if (existing) {
+    db.update(disputeVotesTable)
+      .set({
+        heroId: input.heroId,
+        skillId: input.skillId,
+        stat: input.stat,
+        weight,
+        updatedAt: nowIso
+      })
+      .where(eq(disputeVotesTable.id, ballotId))
+      .run();
+  } else {
+    db.insert(disputeVotesTable)
+      .values({
+        id: ballotId,
+        disputeId: input.disputeId,
+        userId: input.userId,
+        heroId: input.heroId,
+        skillId: input.skillId,
+        stat: input.stat,
+        weight,
+        reputationAwarded: false,
+        createdAt: nowIso,
+        updatedAt: nowIso
+      })
+      .run();
+
+    const user = db.select().from(usersTable).where(eq(usersTable.id, input.userId)).get();
+    if (user) {
+      db.update(usersTable)
+        .set({ votesCount: user.votesCount + 1 })
+        .where(eq(usersTable.id, user.id))
+        .run();
+      ensureAchievement(bundle, user.id, "first_ballot", nowIso);
+    }
+  }
+
+  return db
+    .select()
+    .from(disputeVotesTable)
+    .where(eq(disputeVotesTable.id, ballotId))
+    .get()!;
+}
+
+export function freezeDisputeVoteSnapshot(
+  bundle: AppDbBundle,
+  disputeId: string,
+  frozenAt: string = getMoscowTodayIso()
+): SkillStatModifier[] {
+  const { db } = bundle;
+  const existing = db
+    .select()
+    .from(disputeVoteSnapshotsTable)
+    .where(eq(disputeVoteSnapshotsTable.disputeId, disputeId))
+    .all();
+
+  if (existing.length > 0) {
+    return existing.map((row) => ({
+      skillId: row.skillId,
+      stat: row.stat as SkillStatKind,
+      appliedBonus: row.appliedBonus
+    }));
+  }
+
+  const ballots = db
+    .select()
+    .from(disputeVotesTable)
+    .where(eq(disputeVotesTable.disputeId, disputeId))
+    .all();
+
+  if (ballots.length === 0) {
+    return [];
+  }
+
+  const computed = computeVoteSnapshot(
+    ballots.map((b) => ({
+      userId: b.userId,
+      heroId: b.heroId,
+      skillId: b.skillId,
+      stat: b.stat as SkillStatKind,
+      weight: (b.weight === 2 ? 2 : 1) as VoteWeight
+    }))
+  );
+
+  for (const adj of computed.adjustments) {
+    db.insert(disputeVoteSnapshotsTable)
+      .values({
+        id: `${disputeId}:snap:${adj.skillId}:${adj.stat}`,
+        disputeId,
+        heroId: adj.heroId,
+        skillId: adj.skillId,
+        stat: adj.stat,
+        totalWeight: adj.totalWeight,
+        share: adj.share,
+        rawBonus: adj.rawBonus,
+        appliedBonus: adj.appliedBonus,
+        frozenAt
+      })
+      .run();
+  }
+
+  return computed.adjustments.map((adj) => ({
+    skillId: adj.skillId,
+    stat: adj.stat,
+    appliedBonus: adj.appliedBonus
+  }));
+}
+
+export function submitUserProposal(
+  bundle: AppDbBundle,
+  input: {
+    userId: string;
+    kind: "hero" | "skill";
+    targetHeroId?: string | null;
+    proposedName: string;
+    originOrDomain: string;
+    description: string;
+    publicDomainAttested: boolean;
+    licenseGranted: boolean;
+    nowIso?: string;
+  }
+): typeof heroSubmissionsTable.$inferSelect {
+  const { db } = bundle;
+  const nowIso = input.nowIso ?? getMoscowTodayIso();
+
+  if (!input.publicDomainAttested || !input.licenseGranted) {
+    throw new Error("Both public domain attestation and license grant are required");
+  }
+
+  const user = db.select().from(usersTable).where(eq(usersTable.id, input.userId)).get();
+  if (!user) {
+    throw new Error("User not found");
+  }
+  if (user.reputationPoints < REPUTATION_PROPOSAL_THRESHOLD) {
+    throw new Error(
+      `Reputation threshold not reached (${user.reputationPoints}/${REPUTATION_PROPOSAL_THRESHOLD})`
+    );
+  }
+
+  const tournaments = db
+    .select()
+    .from(tournamentsTable)
+    .orderBy(asc(tournamentsTable.editionNumber))
+    .all();
+  const activeEdition =
+    tournaments.find((t) => t.status === "active")?.editionNumber ??
+    tournaments[tournaments.length - 1]?.editionNumber ??
+    1;
+
+  const existingThisSeason = db
+    .select()
+    .from(heroSubmissionsTable)
+    .where(
+      and(
+        eq(heroSubmissionsTable.userId, input.userId),
+        eq(heroSubmissionsTable.seasonEdition, activeEdition)
+      )
+    )
+    .get();
+
+  if (existingThisSeason) {
+    throw new Error("Season proposal quota is already used");
+  }
+
+  const id = `sub:${activeEdition}:${input.userId}`;
+  db.insert(heroSubmissionsTable)
+    .values({
+      id,
+      userId: input.userId,
+      seasonEdition: activeEdition,
+      kind: input.kind,
+      targetHeroId: input.kind === "skill" ? (input.targetHeroId ?? null) : null,
+      proposedName: input.proposedName.trim(),
+      originOrDomain: input.originOrDomain.trim(),
+      description: input.description.trim(),
+      publicDomainAttested: true,
+      licenseGranted: true,
+      status: "pending_moderation",
+      createdAt: nowIso
+    })
+    .run();
+
+  ensureAchievement(bundle, user.id, "patron_proposer", nowIso);
+
+  return db.select().from(heroSubmissionsTable).where(eq(heroSubmissionsTable.id, id)).get()!;
+}
+
 function loadAnnouncementFromDb(
   bundle: AppDbBundle,
   disputeId: string,
@@ -285,6 +655,8 @@ function ensureDisputeAnnounced(
   if (!disputeRow.heroAId || !disputeRow.heroBId) {
     return null;
   }
+
+  freezeDisputeVoteSnapshot(bundle, disputeRow.id, disputeRow.scheduledDate);
 
   const existing = loadAnnouncementFromDb(bundle, disputeRow.id, disputeRow.seed);
   if (existing) {
@@ -425,6 +797,134 @@ function refreshPlayoffPairingsForTournament(
   }
 }
 
+function settleBallotReputation(
+  bundle: AppDbBundle,
+  disputeId: string,
+  winnerHeroId: string | null,
+  settledDateIso: string
+): void {
+  const { db } = bundle;
+  const ballots = db
+    .select()
+    .from(disputeVotesTable)
+    .where(eq(disputeVotesTable.disputeId, disputeId))
+    .all();
+
+  for (const ballot of ballots) {
+    if (ballot.reputationAwarded) {
+      continue;
+    }
+
+    const user = db.select().from(usersTable).where(eq(usersTable.id, ballot.userId)).get();
+    if (user) {
+      const won = winnerHeroId !== null && ballot.heroId === winnerHeroId;
+      if (won) {
+        const nextRep = user.reputationPoints + 1;
+        const nextWins = user.winsCount + 1;
+        const nextStreak = user.currentStreak + 1;
+        const nextBest = Math.max(user.bestStreak, nextStreak);
+
+        db.update(usersTable)
+          .set({
+            reputationPoints: nextRep,
+            winsCount: nextWins,
+            currentStreak: nextStreak,
+            bestStreak: nextBest
+          })
+          .where(eq(usersTable.id, user.id))
+          .run();
+
+        ensureAchievement(bundle, user.id, "first_victory", settledDateIso);
+        if (nextStreak >= 3) {
+          ensureAchievement(bundle, user.id, "streak_3", settledDateIso);
+        }
+        if (nextWins >= 5) {
+          ensureAchievement(bundle, user.id, "oracle_5", settledDateIso);
+        }
+      } else {
+        db.update(usersTable)
+          .set({ currentStreak: 0 })
+          .where(eq(usersTable.id, user.id))
+          .run();
+      }
+    }
+
+    db.update(disputeVotesTable)
+      .set({ reputationAwarded: true })
+      .where(eq(disputeVotesTable.id, ballot.id))
+      .run();
+  }
+}
+
+function recordDisputeCommentaries(
+  bundle: AppDbBundle,
+  disputeId: string,
+  heroAId: string,
+  heroBId: string,
+  sim: ReturnType<typeof simulateDispute>
+): void {
+  const { db } = bundle;
+  const heroA = HERO_BY_ID.get(heroAId)!;
+  const heroB = HERO_BY_ID.get(heroBId)!;
+  const skillById = new Map(
+    [...heroA.dominants, ...heroA.appeals, ...heroB.dominants, ...heroB.appeals].map((s) => [
+      s.id,
+      s
+    ])
+  );
+
+  for (const locale of ["ru", "en", "es"] as const) {
+    const locA = localizeHero(heroA, locale);
+    const locB = localizeHero(heroB, locale);
+    const winnerName =
+      sim.winnerSide === "A" ? locA.name : sim.winnerSide === "B" ? locB.name : null;
+
+    const exchanges = sim.exchanges.map((ex) => {
+      const dom = localizeSkill(skillById.get(ex.dominantSkillId)!, locale);
+      const app = localizeSkill(skillById.get(ex.appealSkillId)!, locale);
+      return {
+        step: ex.step,
+        phase: ex.phase,
+        attackerName: ex.attackerSide === "A" ? locA.name : locB.name,
+        defenderName: ex.defenderSide === "A" ? locA.name : locB.name,
+        dominantTitle: dom.title,
+        appealTitle: app.title,
+        dominantDomain: ex.dominantDomain,
+        appealDomain: ex.appealDomain,
+        affinity: ex.affinity,
+        acclaim: ex.acclaim,
+        retention: ex.retention
+      };
+    });
+
+    const built = buildProtocolCommentary({
+      locale,
+      heroAName: locA.name,
+      heroBName: locB.name,
+      acclaimA: sim.acclaimA,
+      acclaimB: sim.acclaimB,
+      retentionA: sim.retentionA,
+      retentionB: sim.retentionB,
+      winnerName,
+      resolution: sim.resolution,
+      exchanges
+    });
+
+    db.insert(disputeCommentariesTable)
+      .values({
+        id: `${disputeId}:comm:${locale}`,
+        disputeId,
+        locale,
+        headline: built.headline,
+        summary: built.summary,
+        keyTurn: built.keyTurn,
+        modelTag: "protocol-analyst-v1"
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+}
+
 function completeDispute(
   bundle: AppDbBundle,
   disputeRow: typeof disputesTable.$inferSelect,
@@ -440,6 +940,8 @@ function completeDispute(
     throw new Error(`Failed to announce dispute ${disputeRow.id}`);
   }
 
+  const modifiers = freezeDisputeVoteSnapshot(bundle, disputeRow.id, disputeRow.scheduledDate);
+
   const heroA = HERO_BY_ID.get(disputeRow.heroAId)!;
   const heroB = HERO_BY_ID.get(disputeRow.heroBId)!;
 
@@ -448,7 +950,8 @@ function completeDispute(
     heroB,
     stage: disputeRow.stage as DisputeStage,
     seed: disputeRow.seed,
-    announcement
+    announcement,
+    modifiers
   });
 
   for (const ex of sim.exchanges) {
@@ -502,6 +1005,9 @@ function completeDispute(
     })
     .where(eq(disputesTable.id, disputeRow.id))
     .run();
+
+  settleBallotReputation(bundle, disputeRow.id, winnerHeroId, disputeRow.scheduledDate);
+  recordDisputeCommentaries(bundle, disputeRow.id, disputeRow.heroAId, disputeRow.heroBId, sim);
 
   // Обновляем рейтинг Эло и пишем пруфы в rating_events
   const heroARow = db
@@ -610,7 +1116,7 @@ export interface TimelineSyncSummary {
 /**
  * В одной транзакции:
  * 1) Все диспуты с датой раньше asOfDateIso досчитываются и закрываются (completed).
- * 2) Все диспуты на asOfDateIso получают открытые навыки (announced) без счёта.
+ * 2) Все диспуты на asOfDateIso получают открытые навыки (announced) без счёта, а окно голосования закрывается.
  */
 export function syncPortalTimeline(
   bundle: AppDbBundle,
@@ -678,36 +1184,121 @@ export function buildDefaultTournamentSpecs(todayIso: string): TournamentEdition
       id: "cup-1",
       slug: "cup-1-winter-cathedral",
       title: "I Кубок: Зимний Собор Идей",
-      subtitle: "Первый большой розыгрыш шести доменов среди шестнадцати классических героев",
+      subtitle: "Открытый жребий: шестнадцать героев из пула пятидесяти в дебютном созыве",
       editionNumber: 1,
-      seed: "heroes-tournament-edition-1-seed-2026",
-      startDate: addDaysIso(todayIso, -56)
+      fieldKind: "open",
+      themeId: null,
+      seed: "ht-pool50-cup-01-open-2026",
+      startDate: addDaysIso(todayIso, -182)
     },
     {
       id: "cup-2",
-      slug: "cup-2-spring-amphora",
-      title: "II Кубок: Весенняя Амфора Риторики",
-      subtitle: "Второй созыв с посевом по итогам дебютного рейтинга Эло",
+      slug: "cup-2-ancient-epic-circle",
+      title: "II Кубок: Круг Мифа и Былины",
+      subtitle: "Тематический созыв: Эллада, Север, славянский эпос и рыцари Круглого стола",
       editionNumber: 2,
-      seed: "heroes-tournament-edition-2-seed-2026",
-      startDate: addDaysIso(todayIso, -38)
+      fieldKind: "theme",
+      themeId: "myth_bylina",
+      seed: "ht-pool50-cup-02-myth-2026",
+      startDate: addDaysIso(todayIso, -164)
     },
     {
       id: "cup-3",
-      slug: "cup-3-autumn-meridian",
-      title: "III Кубок: Осенний Меридиан Мысли",
-      subtitle: "Третий архивный кубок: смена лидеров корзин и новые противостояния в плей-офф",
+      slug: "cup-3-seven-winds-compass",
+      title: "III Кубок: Роза Дороги и Моря",
+      subtitle: "Тематический созыв: мореходы, странники и искатели дальних берегов",
       editionNumber: 3,
-      seed: "heroes-tournament-edition-3-seed-2026",
-      startDate: addDaysIso(todayIso, -20)
+      fieldKind: "theme",
+      themeId: "road_sea",
+      seed: "ht-pool50-cup-03-voyage-2026",
+      startDate: addDaysIso(todayIso, -146)
     },
     {
       id: "cup-4",
-      slug: "cup-4-current-grand-dispute",
-      title: "IV Кубок: Большой Диспут Наследия",
-      subtitle: "Текущий турнир: ежедневные анонсы навыков и борьба за выход из групп",
+      slug: "cup-4-spring-amphora",
+      title: "IV Кубок: Весенняя Амфора Риторики",
+      subtitle: "Открытый жребий с посевом корзин по накопленному рейтингу Эло",
       editionNumber: 4,
-      seed: "heroes-tournament-edition-4-seed-2026",
+      fieldKind: "open",
+      themeId: null,
+      seed: "ht-pool50-cup-04-open-2026",
+      startDate: addDaysIso(todayIso, -128)
+    },
+    {
+      id: "cup-5",
+      slug: "cup-5-carnival-of-riddles",
+      title: "V Кубок: Карнавал Плутов и Загадок",
+      subtitle: "Тематический созыв: мастера инверсии, притчи и неожиданного хода",
+      editionNumber: 5,
+      fieldKind: "theme",
+      themeId: "tricksters",
+      seed: "ht-pool50-cup-05-tricksters-2026",
+      startDate: addDaysIso(todayIso, -110)
+    },
+    {
+      id: "cup-6",
+      slug: "cup-6-chamber-of-direct-proof",
+      title: "VI Кубок: Палата Прямого Довода",
+      subtitle: "Тематический созыв: диспутанты строгого разума, слова и чести",
+      editionNumber: 6,
+      fieldKind: "theme",
+      themeId: "direct_argument",
+      seed: "ht-pool50-cup-06-reason-2026",
+      startDate: addDaysIso(todayIso, -92)
+    },
+    {
+      id: "cup-7",
+      slug: "cup-7-summer-solstice-convocation",
+      title: "VII Кубок: Созыв Солнцеворота",
+      subtitle: "Открытый жребий всех корпусов и мотивов в середине сезона",
+      editionNumber: 7,
+      fieldKind: "open",
+      themeId: null,
+      seed: "ht-pool50-cup-07-open-2026",
+      startDate: addDaysIso(todayIso, -74)
+    },
+    {
+      id: "cup-8",
+      slug: "cup-8-northern-and-bylina-shield",
+      title: "VIII Кубок: Щит Саг и Былин",
+      subtitle: "Второй тематический созыв мифологических, северных и былинных героев",
+      editionNumber: 8,
+      fieldKind: "theme",
+      themeId: "myth_bylina",
+      seed: "ht-pool50-cup-08-myth-2026",
+      startDate: addDaysIso(todayIso, -56)
+    },
+    {
+      id: "cup-9",
+      slug: "cup-9-autumn-meridian",
+      title: "IX Кубок: Осенний Меридиан Мореходов",
+      subtitle: "Тематический созыв дороги и моря: дальние маршруты и проверенные кормчие",
+      editionNumber: 9,
+      fieldKind: "theme",
+      themeId: "road_sea",
+      seed: "ht-pool50-cup-09-voyage-2026",
+      startDate: addDaysIso(todayIso, -38)
+    },
+    {
+      id: "cup-10",
+      slug: "cup-10-lantern-of-paradoxes",
+      title: "X Кубок: Фонарь Парадоксов",
+      subtitle: "Тематический созыв плутов и рассказчиков перед большим открытым турниром",
+      editionNumber: 10,
+      fieldKind: "theme",
+      themeId: "tricksters",
+      seed: "ht-pool50-cup-10-tricksters-2026",
+      startDate: addDaysIso(todayIso, -20)
+    },
+    {
+      id: "cup-11",
+      slug: "cup-11-current-grand-dispute",
+      title: "XI Кубок: Большой Диспут Наследия",
+      subtitle: "Текущий открытый турнир: ежедневные анонсы, голосование за статы и борьба в группах",
+      editionNumber: 11,
+      fieldKind: "open",
+      themeId: null,
+      seed: "ht-pool50-cup-11-open-2026",
       startDate: addDaysIso(todayIso, -2)
     }
   ];
@@ -757,6 +1348,6 @@ export function seedFullPortalDatabase(
   );
 
   if (!verification.valid) {
-    throw new Error(`Rating ledger verification failed:\n${verification.mismatches.join("\n")}`);
+    throw new Error(`Rating ledger verification failed: ${verification.mismatches.join("; ")}`);
   }
 }

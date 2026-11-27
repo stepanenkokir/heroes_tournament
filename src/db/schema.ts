@@ -34,6 +34,8 @@ export const tournamentsTable = sqliteTable("tournaments", {
   title: text("title").notNull(),
   subtitle: text("subtitle").notNull(),
   editionNumber: integer("edition_number").notNull(),
+  fieldKind: text("field_kind").notNull(), // "open" | "theme"
+  themeId: text("theme_id"), // "myth_bylina" | "road_sea" | "tricksters" | "direct_argument" | null
   seed: text("seed").notNull(),
   status: text("status").notNull(), // "active" | "completed"
   startDate: text("start_date").notNull(), // YYYY-MM-DD
@@ -135,4 +137,83 @@ export const ratingEventsTable = sqliteTable("rating_events", {
   kFactor: integer("k_factor").notNull(),
   delta: integer("delta").notNull(),
   ratingAfter: integer("rating_after").notNull()
+});
+
+export const usersTable = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  displayName: text("display_name").notNull(),
+  avatarText: text("avatar_text").notNull(),
+  reputationPoints: integer("reputation_points").notNull(),
+  winsCount: integer("wins_count").notNull(),
+  votesCount: integer("votes_count").notNull(),
+  currentStreak: integer("current_streak").notNull(),
+  bestStreak: integer("best_streak").notNull(),
+  createdAt: text("created_at").notNull()
+});
+
+export const oauthAccountsTable = sqliteTable("oauth_accounts", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  provider: text("provider").notNull(), // "telegram" | "google" | "vk"
+  providerAccountId: text("provider_account_id").notNull(),
+  handle: text("handle").notNull(),
+  linkedAt: text("linked_at").notNull()
+});
+
+export const disputeVotesTable = sqliteTable("dispute_votes", {
+  id: text("id").primaryKey(),
+  disputeId: text("dispute_id").notNull(),
+  userId: text("user_id").notNull(),
+  heroId: text("hero_id").notNull(),
+  skillId: text("skill_id").notNull(),
+  stat: text("stat").notNull(), // "primary" | "secondary"
+  weight: integer("weight").notNull(), // 1 | 2
+  reputationAwarded: integer("reputation_awarded", { mode: "boolean" }).notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
+});
+
+export const disputeVoteSnapshotsTable = sqliteTable("dispute_vote_snapshots", {
+  id: text("id").primaryKey(),
+  disputeId: text("dispute_id").notNull(),
+  heroId: text("hero_id").notNull(),
+  skillId: text("skill_id").notNull(),
+  stat: text("stat").notNull(), // "primary" | "secondary"
+  totalWeight: integer("total_weight").notNull(),
+  share: real("share").notNull(),
+  rawBonus: real("raw_bonus").notNull(),
+  appliedBonus: integer("applied_bonus").notNull(),
+  frozenAt: text("frozen_at").notNull()
+});
+
+export const userAchievementsTable = sqliteTable("user_achievements", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  code: text("code").notNull(),
+  earnedAt: text("earned_at").notNull()
+});
+
+export const heroSubmissionsTable = sqliteTable("hero_submissions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  seasonEdition: integer("season_edition").notNull(),
+  kind: text("kind").notNull(), // "hero" | "skill"
+  targetHeroId: text("target_hero_id"),
+  proposedName: text("proposed_name").notNull(),
+  originOrDomain: text("origin_or_domain").notNull(),
+  description: text("description").notNull(),
+  publicDomainAttested: integer("public_domain_attested", { mode: "boolean" }).notNull(),
+  licenseGranted: integer("license_granted", { mode: "boolean" }).notNull(),
+  status: text("status").notNull(), // "pending_moderation" | "approved" | "rejected"
+  createdAt: text("created_at").notNull()
+});
+
+export const disputeCommentariesTable = sqliteTable("dispute_commentaries", {
+  id: text("id").primaryKey(),
+  disputeId: text("dispute_id").notNull(),
+  locale: text("locale").notNull(), // "ru" | "en" | "es"
+  headline: text("headline").notNull(),
+  summary: text("summary").notNull(),
+  keyTurn: text("key_turn").notNull(),
+  modelTag: text("model_tag").notNull()
 });

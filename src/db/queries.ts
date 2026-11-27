@@ -1,6 +1,7 @@
 import { asc, desc, eq } from "drizzle-orm";
 import {
   computeGroupStandings,
+  computeVoteSnapshot,
   getGroupCodes,
   INITIAL_ELO_RATING,
   PLAYOFF_BLUEPRINT,
@@ -8,18 +9,28 @@ import {
   type CompletedGroupMatchRecord,
   type DisputeSide,
   type GroupAssignment,
-  type GroupStandingRow
+  type GroupStandingRow,
+  type SkillStatKind,
+  type VoteWeight
 } from "../domain/index";
 import { getGlobalDbBundle, type AppDbBundle } from "./client";
+import { REPUTATION_PROPOSAL_THRESHOLD } from "./engine";
 import {
   disputeAnnouncementsTable,
+  disputeCommentariesTable,
   disputeExchangesTable,
   disputesTable,
+  disputeVoteSnapshotsTable,
+  disputeVotesTable,
   heroesTable,
+  heroSubmissionsTable,
+  oauthAccountsTable,
   ratingEventsTable,
   skillsTable,
   tournamentParticipantsTable,
-  tournamentsTable
+  tournamentsTable,
+  userAchievementsTable,
+  usersTable
 } from "./schema";
 
 export type HeroRow = typeof heroesTable.$inferSelect;
@@ -28,12 +39,25 @@ export type TournamentRow = typeof tournamentsTable.$inferSelect;
 export type DisputeRow = typeof disputesTable.$inferSelect;
 export type ExchangeRow = typeof disputeExchangesTable.$inferSelect;
 export type RatingEventRow = typeof ratingEventsTable.$inferSelect;
+export type VoteSnapshotRow = typeof disputeVoteSnapshotsTable.$inferSelect;
+export type CommentaryRow = typeof disputeCommentariesTable.$inferSelect;
+export type UserRow = typeof usersTable.$inferSelect;
 
 export interface AnnouncedSkillPairView {
   slotIndex: number;
   isSealed: boolean;
   dominant: SkillRow;
   appeal: SkillRow;
+}
+
+export interface HydratedVoteShiftView {
+  heroId: string;
+  skill: SkillRow;
+  stat: SkillStatKind;
+  totalWeight: number;
+  share: number;
+  rawBonus: number;
+  appliedBonus: number;
 }
 
 export interface DisputeCardView {
@@ -43,6 +67,10 @@ export interface DisputeCardView {
   heroB: HeroRow | null;
   announcedA: AnnouncedSkillPairView[];
   announcedB: AnnouncedSkillPairView[];
+  skillsA: SkillRow[];
+  skillsB: SkillRow[];
+  voteSnapshots: HydratedVoteShiftView[];
+  liveBallotsCount: number;
 }
 
 export interface GroupTableView {
@@ -86,12 +114,32 @@ function buildMaps(bundle = getReadyDb()) {
     .from(tournamentsTable)
     .orderBy(asc(tournamentsTable.editionNumber))
     .all();
+  const voteSnapshots = db.select().from(disputeVoteSnapshotsTable).all();
+  const liveVotes = db.select().from(disputeVotesTable).all();
 
   const heroMap = new Map(heroes.map((h) => [h.id, h]));
   const skillMap = new Map(skills.map((s) => [s.id, s]));
   const tournamentMap = new Map(tournaments.map((t) => [t.id, t]));
+  const skillsByHero = new Map<string, SkillRow[]>();
+  for (const s of skills) {
+    const arr = skillsByHero.get(s.heroId) ?? [];
+    arr.push(s);
+    skillsByHero.set(s.heroId, arr);
+  }
 
-  return { bundle, db, heroes, skills, tournaments, heroMap, skillMap, tournamentMap };
+  return {
+    bundle,
+    db,
+    heroes,
+    skills,
+    tournaments,
+    voteSnapshots,
+    liveVotes,
+    heroMap,
+    skillMap,
+    tournamentMap,
+    skillsByHero
+  };
 }
 
 function hydrateDisputeCard(
@@ -99,7 +147,10 @@ function hydrateDisputeCard(
   announcementRows: Array<typeof disputeAnnouncementsTable.$inferSelect>,
   heroMap: ReadonlyMap<string, HeroRow>,
   skillMap: ReadonlyMap<string, SkillRow>,
-  tournamentMap: ReadonlyMap<string, TournamentRow>
+  tournamentMap: ReadonlyMap<string, TournamentRow>,
+  skillsByHero: ReadonlyMap<string, SkillRow[]>,
+  allVoteSnapshots: readonly VoteSnapshotRow[],
+  allLiveVotes: Array<typeof disputeVotesTable.$inferSelect>
 ): DisputeCardView {
   const forDispute = announcementRows
     .filter((a) => a.disputeId === dispute.id && a.slotIndex <= 2)
@@ -115,18 +166,82 @@ function hydrateDisputeCard(
         appeal: skillMap.get(r.appealSkillId)!
       }));
 
+  const disputeLiveVotes = allLiveVotes.filter((v) => v.disputeId === dispute.id);
+  const frozenRows = allVoteSnapshots.filter((s) => s.disputeId === dispute.id);
+
+  let voteSnapshots: HydratedVoteShiftView[] = [];
+  if (frozenRows.length > 0) {
+    voteSnapshots = frozenRows
+      .map((r) => {
+        const skill = skillMap.get(r.skillId);
+        if (!skill) {
+          return null;
+        }
+        return {
+          heroId: r.heroId,
+          skill,
+          stat: r.stat as SkillStatKind,
+          totalWeight: r.totalWeight,
+          share: r.share,
+          rawBonus: r.rawBonus,
+          appliedBonus: r.appliedBonus
+        };
+      })
+      .filter((item): item is HydratedVoteShiftView => item !== null);
+  } else if (dispute.status === "scheduled" && disputeLiveVotes.length > 0) {
+    const computed = computeVoteSnapshot(
+      disputeLiveVotes.map((b) => ({
+        userId: b.userId,
+        heroId: b.heroId,
+        skillId: b.skillId,
+        stat: b.stat as SkillStatKind,
+        weight: (b.weight === 2 ? 2 : 1) as VoteWeight
+      }))
+    );
+    voteSnapshots = computed.adjustments
+      .map((adj) => {
+        const skill = skillMap.get(adj.skillId);
+        if (!skill) {
+          return null;
+        }
+        return {
+          heroId: adj.heroId,
+          skill,
+          stat: adj.stat,
+          totalWeight: adj.totalWeight,
+          share: adj.share,
+          rawBonus: adj.rawBonus,
+          appliedBonus: adj.appliedBonus
+        };
+      })
+      .filter((item): item is HydratedVoteShiftView => item !== null);
+  }
+
   return {
     dispute,
     tournament: tournamentMap.get(dispute.tournamentId)!,
     heroA: dispute.heroAId ? (heroMap.get(dispute.heroAId) ?? null) : null,
     heroB: dispute.heroBId ? (heroMap.get(dispute.heroBId) ?? null) : null,
     announcedA: mapSide("A"),
-    announcedB: mapSide("B")
+    announcedB: mapSide("B"),
+    skillsA: dispute.heroAId ? (skillsByHero.get(dispute.heroAId) ?? []) : [],
+    skillsB: dispute.heroBId ? (skillsByHero.get(dispute.heroBId) ?? []) : [],
+    voteSnapshots,
+    liveBallotsCount: disputeLiveVotes.length
   };
 }
 
 export function getHomePortalData(bundle = getReadyDb()) {
-  const { db, tournaments, heroMap, skillMap, tournamentMap } = buildMaps(bundle);
+  const {
+    db,
+    tournaments,
+    voteSnapshots,
+    liveVotes,
+    heroMap,
+    skillMap,
+    tournamentMap,
+    skillsByHero
+  } = buildMaps(bundle);
 
   const activeTournament =
     tournaments.find((t) => t.status === "active") ?? tournaments[tournaments.length - 1] ?? null;
@@ -151,14 +266,52 @@ export function getHomePortalData(bundle = getReadyDb()) {
   const todayDisputes = todayIso
     ? allActiveDisputes
         .filter((d) => d.status === "announced" && d.scheduledDate === todayIso)
-        .map((d) => hydrateDisputeCard(d, announcementRows, heroMap, skillMap, tournamentMap))
+        .map((d) =>
+          hydrateDisputeCard(
+            d,
+            announcementRows,
+            heroMap,
+            skillMap,
+            tournamentMap,
+            skillsByHero,
+            voteSnapshots,
+            liveVotes
+          )
+        )
     : [];
+
+  const upcomingVotingDisputes = allActiveDisputes
+    .filter((d) => d.status === "scheduled" && d.heroAId !== null && d.heroBId !== null)
+    .slice(0, 4)
+    .map((d) =>
+      hydrateDisputeCard(
+        d,
+        announcementRows,
+        heroMap,
+        skillMap,
+        tournamentMap,
+        skillsByHero,
+        voteSnapshots,
+        liveVotes
+      )
+    );
 
   const recentDisputes = allActiveDisputes
     .filter((d) => d.status === "completed")
     .slice(-4)
     .reverse()
-    .map((d) => hydrateDisputeCard(d, announcementRows, heroMap, skillMap, tournamentMap));
+    .map((d) =>
+      hydrateDisputeCard(
+        d,
+        announcementRows,
+        heroMap,
+        skillMap,
+        tournamentMap,
+        skillsByHero,
+        voteSnapshots,
+        liveVotes
+      )
+    );
 
   const topHeroes = [...heroMap.values()]
     .sort((a, b) => b.currentRating - a.currentRating || b.wins - a.wins)
@@ -168,6 +321,7 @@ export function getHomePortalData(bundle = getReadyDb()) {
     todayIso,
     activeTournament,
     todayDisputes,
+    upcomingVotingDisputes,
     recentDisputes,
     completedTournaments: completedTournaments.map((t) => ({
       tournament: t,
@@ -191,7 +345,16 @@ export function getTournamentFullView(
   slugOrActive: string | "active",
   bundle = getReadyDb()
 ): TournamentFullView | null {
-  const { db, tournaments, heroMap, skillMap, tournamentMap } = buildMaps(bundle);
+  const {
+    db,
+    tournaments,
+    voteSnapshots,
+    liveVotes,
+    heroMap,
+    skillMap,
+    tournamentMap,
+    skillsByHero
+  } = buildMaps(bundle);
 
   const tournament =
     slugOrActive === "active"
@@ -220,7 +383,16 @@ export function getTournamentFullView(
 
   const announcementRows = db.select().from(disputeAnnouncementsTable).all();
   const cards = disputeRows.map((d) =>
-    hydrateDisputeCard(d, announcementRows, heroMap, skillMap, tournamentMap)
+    hydrateDisputeCard(
+      d,
+      announcementRows,
+      heroMap,
+      skillMap,
+      tournamentMap,
+      skillsByHero,
+      voteSnapshots,
+      liveVotes
+    )
   );
 
   const groups: GroupTableView[] = [];
@@ -295,8 +467,16 @@ export function getTournamentFullView(
   };
 }
 
-export function getDisputeProtocolView(disputeId: string) {
-  const { db, heroMap, skillMap, tournamentMap } = buildMaps();
+export function getDisputeProtocolView(disputeId: string, bundle = getReadyDb()) {
+  const {
+    db,
+    voteSnapshots,
+    liveVotes,
+    heroMap,
+    skillMap,
+    tournamentMap,
+    skillsByHero
+  } = buildMaps(bundle);
 
   const dispute = db.select().from(disputesTable).where(eq(disputesTable.id, disputeId)).get();
   if (!dispute) {
@@ -310,7 +490,16 @@ export function getDisputeProtocolView(disputeId: string) {
     .orderBy(asc(disputeAnnouncementsTable.slotIndex))
     .all();
 
-  const card = hydrateDisputeCard(dispute, announcementRows, heroMap, skillMap, tournamentMap);
+  const card = hydrateDisputeCard(
+    dispute,
+    announcementRows,
+    heroMap,
+    skillMap,
+    tournamentMap,
+    skillsByHero,
+    voteSnapshots,
+    liveVotes
+  );
 
   const exchangeRows = db
     .select()
@@ -331,6 +520,12 @@ export function getDisputeProtocolView(disputeId: string) {
     .where(eq(ratingEventsTable.disputeId, dispute.id))
     .all();
 
+  const commentaries = db
+    .select()
+    .from(disputeCommentariesTable)
+    .where(eq(disputeCommentariesTable.disputeId, dispute.id))
+    .all();
+
   const eloA = dispute.heroAId
     ? (ratingEvents.find((e) => e.heroId === dispute.heroAId) ?? null)
     : null;
@@ -342,12 +537,13 @@ export function getDisputeProtocolView(disputeId: string) {
     card,
     exchanges,
     eloA,
-    eloB
+    eloB,
+    commentaries
   };
 }
 
-export function getRatingsLeaderboardView() {
-  const { db, heroes, heroMap, tournamentMap } = buildMaps();
+export function getRatingsLeaderboardView(bundle = getReadyDb()) {
+  const { db, heroes, heroMap, tournamentMap } = buildMaps(bundle);
   const allEvents = db
     .select()
     .from(ratingEventsTable)
@@ -408,8 +604,8 @@ export function getRatingsLeaderboardView() {
   };
 }
 
-export function getHeroProfileView(slug: string) {
-  const { db, heroes, skills, heroMap, tournamentMap } = buildMaps();
+export function getHeroProfileView(slug: string, bundle = getReadyDb()) {
+  const { db, heroes, skills, heroMap, tournamentMap } = buildMaps(bundle);
   const hero = heroes.find((h) => h.slug === slug || h.id === slug);
   if (!hero) {
     return null;
@@ -444,7 +640,6 @@ export function getHeroProfileView(slug: string) {
     dispute: disputeMap.get(ev.disputeId)!
   }));
 
-  // Анонсированный сегодняшний матч с участием героя, если есть
   const activeDisputes = disputes.filter(
     (d) => d.status === "announced" && (d.heroAId === hero.id || d.heroBId === hero.id)
   );
@@ -456,5 +651,129 @@ export function getHeroProfileView(slug: string) {
     appeals,
     ledger,
     activeDisputes
+  };
+}
+
+export function getCabinetView(userId: string | null, bundle = getReadyDb()) {
+  const {
+    db,
+    heroes,
+    tournaments,
+    voteSnapshots,
+    liveVotes,
+    heroMap,
+    skillMap,
+    tournamentMap,
+    skillsByHero
+  } = buildMaps(bundle);
+
+  const allUsers = db.select().from(usersTable).all();
+  const leaderboardUsers = [...allUsers]
+    .sort(
+      (a, b) =>
+        b.reputationPoints - a.reputationPoints ||
+        b.winsCount - a.winsCount ||
+        b.bestStreak - a.bestStreak
+    )
+    .slice(0, 15);
+
+  const currentUser = userId ? (allUsers.find((u) => u.id === userId) ?? null) : null;
+  const linkedAccounts = currentUser
+    ? db
+        .select()
+        .from(oauthAccountsTable)
+        .where(eq(oauthAccountsTable.userId, currentUser.id))
+        .all()
+    : [];
+
+  const achievements = currentUser
+    ? db
+        .select()
+        .from(userAchievementsTable)
+        .where(eq(userAchievementsTable.userId, currentUser.id))
+        .all()
+    : [];
+
+  const submissions = currentUser
+    ? db
+        .select()
+        .from(heroSubmissionsTable)
+        .where(eq(heroSubmissionsTable.userId, currentUser.id))
+        .all()
+    : [];
+
+  const allDisputes = db.select().from(disputesTable).all();
+  const disputeMap = new Map(allDisputes.map((d) => [d.id, d]));
+
+  const userBallots = currentUser
+    ? liveVotes
+        .filter((v) => v.userId === currentUser.id)
+        .map((v) => {
+          const dispute = disputeMap.get(v.disputeId);
+          const hero = heroMap.get(v.heroId);
+          const skill = skillMap.get(v.skillId);
+          const tournament = dispute ? tournamentMap.get(dispute.tournamentId) : undefined;
+          if (!dispute || !hero || !skill || !tournament) {
+            return null;
+          }
+          const won =
+            dispute.status === "completed" &&
+            dispute.winnerHeroId !== null &&
+            dispute.winnerHeroId === v.heroId;
+          return {
+            ballot: v,
+            dispute,
+            tournament,
+            hero,
+            skill,
+            won
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
+    : [];
+
+  const openBallots = userBallots.filter((b) => b.dispute.status !== "completed");
+  const closedBallots = userBallots.filter((b) => b.dispute.status === "completed");
+
+  const activeTournament =
+    tournaments.find((t) => t.status === "active") ?? tournaments[tournaments.length - 1] ?? null;
+  const announcementRows = db.select().from(disputeAnnouncementsTable).all();
+
+  const openVotingDisputes = activeTournament
+    ? allDisputes
+        .filter(
+          (d) =>
+            d.tournamentId === activeTournament.id &&
+            d.status === "scheduled" &&
+            d.heroAId !== null &&
+            d.heroBId !== null
+        )
+        .slice(0, 8)
+        .map((d) =>
+          hydrateDisputeCard(
+            d,
+            announcementRows,
+            heroMap,
+            skillMap,
+            tournamentMap,
+            skillsByHero,
+            voteSnapshots,
+            liveVotes
+          )
+        )
+    : [];
+
+  return {
+    currentUser,
+    linkedAccounts,
+    achievements,
+    submissions,
+    openBallots,
+    closedBallots,
+    leaderboardUsers,
+    openVotingDisputes,
+    reputationThreshold: REPUTATION_PROPOSAL_THRESHOLD,
+    activeEdition: activeTournament?.editionNumber ?? 11,
+    allHeroes: heroes
   };
 }
