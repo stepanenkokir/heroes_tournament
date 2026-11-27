@@ -9,6 +9,7 @@
     "start": "next start",
     "seed": "tsx src/db/seed.ts",
     "advance": "tsx src/db/advance.ts",
+    "bot": "tsx src/bot/index.ts",
     "test": "vitest run"
   },
   "dependencies": {
