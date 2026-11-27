@@ -74,6 +74,11 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
   const visibleDays =
     selectedDayOffset === "all" ? days : days.filter((day) => day.dayOffset === selectedDayOffset);
   const editions = allTournaments.map((item) => localizeTournament(item, locale));
+  const themeKey =
+    data.tournament.fieldKind === "theme" && data.tournament.themeId
+      ? (data.tournament.themeId as keyof typeof messages.themes)
+      : "open";
+  const themeLabel = messages.themes[themeKey] ?? messages.themes.open;
 
   return (
     <div className="tournament-view">
@@ -98,7 +103,7 @@ export function TournamentView({ data, allTournaments }: TournamentViewProps) {
             })}
           </div>
           <span className="page-hero__dates">
-            {formatLocaleDate(tournament.startDate, locale, "long")} —{" "}
+            {themeLabel} · {formatLocaleDate(tournament.startDate, locale, "long")} —{" "}
             {formatLocaleDate(tournament.endDate, locale, "long")}
           </span>
         </div>

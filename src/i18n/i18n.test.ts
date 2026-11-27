@@ -73,9 +73,9 @@ describe("локали En, Es, Ru", () => {
   });
 
   it("переводит героев, навыки и кубки и оставляет русский текст каноническим", () => {
-    expect(Object.keys(SKILL_COPY)).toHaveLength(160);
+    expect(Object.keys(SKILL_COPY)).toHaveLength(500);
     expect(Object.keys(HERO_COPY)).toHaveLength(HERO_ROSTER.length);
-    expect(Object.keys(TOURNAMENT_COPY)).toHaveLength(4);
+    expect(Object.keys(TOURNAMENT_COPY)).toHaveLength(11);
 
     for (const hero of HERO_ROSTER) {
       expect(localizeHero(hero, "ru").name).toBe(hero.name);
@@ -97,13 +97,13 @@ describe("локали En, Es, Ru", () => {
 
     const cup = localizeTournament(
       {
-        slug: "cup-4-current-grand-dispute",
-        title: "IV Кубок: Большой Диспут Наследия",
+        slug: "cup-11-current-grand-dispute",
+        title: "XI Кубок: Большой Диспут Наследия",
         subtitle: "исходный"
       },
       "es"
     );
-    expect(cup.title).toContain("Copa IV");
+    expect(cup.title).toContain("Copa XI");
     expect(cup.subtitle).not.toBe("исходный");
   });
 

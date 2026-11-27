@@ -80,6 +80,16 @@ export default async function RulesPage() {
           <pre className="formula-pre">{messages.rules.eloFormula}</pre>
           <p style={{ color: "var(--ink-soft)", fontSize: "0.88rem" }}>{messages.rules.s5Note}</p>
         </article>
+
+        <article className="rule-card">
+          <h3>{messages.rules.s6Title}</h3>
+          <p style={{ color: "var(--ink-soft)", marginBottom: "0.65rem" }}>{messages.rules.s6Lead}</p>
+          <ul style={{ paddingLeft: "1.2rem", color: "var(--ink-soft)", fontSize: "0.88rem" }}>
+            <li style={{ marginBottom: "0.4rem" }}>{messages.rules.s6PublicDomain}</li>
+            <li style={{ marginBottom: "0.4rem" }}>{messages.rules.s6Submissions}</li>
+            <li>{messages.rules.s6NoBetting}</li>
+          </ul>
+        </article>
       </div>
     </div>
   );

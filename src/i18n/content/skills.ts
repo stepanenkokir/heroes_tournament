@@ -1,4 +1,6 @@
 import type { SkillText } from "./catalog";
+import { EXTRA_SKILL_ROWS_1 } from "./skills-extra-1";
+import { EXTRA_SKILL_ROWS_2 } from "./skills-extra-2";
 
 type Row = readonly [string, string, string, string, string];
 
@@ -166,11 +168,13 @@ const ROWS: readonly Row[] = [
 ];
 
 export const SKILL_COPY: Record<string, Record<"en" | "es", SkillText>> = Object.fromEntries(
-  ROWS.map(([id, enTitle, enDescription, esTitle, esDescription]) => [
-    id,
-    {
-      en: { title: enTitle, description: enDescription },
-      es: { title: esTitle, description: esDescription }
-    }
-  ])
+  [...ROWS, ...EXTRA_SKILL_ROWS_1, ...EXTRA_SKILL_ROWS_2].map(
+    ([id, enTitle, enDescription, esTitle, esDescription]) => [
+      id,
+      {
+        en: { title: enTitle, description: enDescription },
+        es: { title: esTitle, description: esDescription }
+      }
+    ]
+  )
 );

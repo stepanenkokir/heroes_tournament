@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS tournaments (
   title TEXT NOT NULL,
   subtitle TEXT NOT NULL,
   edition_number INTEGER NOT NULL,
+  field_kind TEXT NOT NULL DEFAULT 'open',
+  theme_id TEXT,
   seed TEXT NOT NULL,
   status TEXT NOT NULL,
   start_date TEXT NOT NULL,
@@ -149,10 +151,103 @@ CREATE TABLE IF NOT EXISTS rating_events (
   rating_after INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,
+  avatar_text TEXT NOT NULL,
+  reputation_points INTEGER NOT NULL DEFAULT 0,
+  wins_count INTEGER NOT NULL DEFAULT 0,
+  votes_count INTEGER NOT NULL DEFAULT 0,
+  current_streak INTEGER NOT NULL DEFAULT 0,
+  best_streak INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS oauth_accounts (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  provider_account_id TEXT NOT NULL,
+  handle TEXT NOT NULL,
+  linked_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS dispute_votes (
+  id TEXT PRIMARY KEY,
+  dispute_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  hero_id TEXT NOT NULL,
+  skill_id TEXT NOT NULL,
+  stat TEXT NOT NULL,
+  weight INTEGER NOT NULL DEFAULT 1,
+  reputation_awarded INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS dispute_vote_snapshots (
+  id TEXT PRIMARY KEY,
+  dispute_id TEXT NOT NULL,
+  hero_id TEXT NOT NULL,
+  skill_id TEXT NOT NULL,
+  stat TEXT NOT NULL,
+  total_weight INTEGER NOT NULL,
+  share REAL NOT NULL,
+  raw_bonus REAL NOT NULL,
+  applied_bonus INTEGER NOT NULL,
+  frozen_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_achievements (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  code TEXT NOT NULL,
+  earned_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS hero_submissions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  season_edition INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  target_hero_id TEXT,
+  proposed_name TEXT NOT NULL,
+  origin_or_domain TEXT NOT NULL,
+  description TEXT NOT NULL,
+  public_domain_attested INTEGER NOT NULL,
+  license_granted INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS dispute_commentaries (
+  id TEXT PRIMARY KEY,
+  dispute_id TEXT NOT NULL,
+  locale TEXT NOT NULL,
+  headline TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  key_turn TEXT NOT NULL,
+  model_tag TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_disputes_tournament ON disputes(tournament_id, day_offset, match_order);
 CREATE INDEX IF NOT EXISTS idx_rating_events_hero ON rating_events(hero_id, sequence);
 CREATE INDEX IF NOT EXISTS idx_rating_events_dispute ON rating_events(dispute_id);
+CREATE INDEX IF NOT EXISTS idx_dispute_votes_dispute ON dispute_votes(dispute_id);
+CREATE INDEX IF NOT EXISTS idx_dispute_vote_snapshots_dispute ON dispute_vote_snapshots(dispute_id);
+CREATE INDEX IF NOT EXISTS idx_dispute_commentaries_dispute ON dispute_commentaries(dispute_id, locale);
 `;
+
+function ensureColumnsMigrated(sqlite: BetterSqliteDatabase): void {
+  const columns = sqlite.pragma("table_info(tournaments)") as Array<{ name: string }>;
+  const names = new Set(columns.map((c) => c.name));
+  if (!names.has("field_kind")) {
+    sqlite.exec("ALTER TABLE tournaments ADD COLUMN field_kind TEXT NOT NULL DEFAULT 'open';");
+  }
+  if (!names.has("theme_id")) {
+    sqlite.exec("ALTER TABLE tournaments ADD COLUMN theme_id TEXT;");
+  }
+}
 
 export function createDbBundle(dbPath: string): AppDbBundle {
   if (dbPath !== ":memory:") {
@@ -163,6 +258,7 @@ export function createDbBundle(dbPath: string): AppDbBundle {
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
   sqlite.exec(BOOTSTRAP_DDL);
+  ensureColumnsMigrated(sqlite);
 
   const db = drizzle(sqlite, { schema });
   return { sqlite, db };

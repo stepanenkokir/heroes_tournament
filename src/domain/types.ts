@@ -2,6 +2,34 @@ export type DomainId = "reason" | "word" | "heart" | "will" | "luck" | "honor";
 
 export type SkillKind = "dominant" | "appeal";
 
+export type SkillStatKind = "primary" | "secondary";
+
+export type VoteWeight = 1 | 2;
+
+export type HeroCorpus =
+  | "hellenic"
+  | "slavic"
+  | "norse"
+  | "east"
+  | "arab"
+  | "chivalry"
+  | "letters";
+
+export type HeroMotif =
+  | "voyage"
+  | "trickster"
+  | "reason"
+  | "will"
+  | "honor";
+
+export type TournamentFieldKind = "open" | "theme";
+
+export type TournamentThemeId =
+  | "myth_bylina"
+  | "road_sea"
+  | "tricksters"
+  | "direct_argument";
+
 export type DisputeStage = "group" | "qf" | "sf" | "final";
 
 export type DisputeStatus = "scheduled" | "announced" | "completed";
@@ -36,8 +64,16 @@ export interface HeroDefinition {
   epithet: string;
   emblemKey: string;
   accentHex: string;
+  corpora: readonly HeroCorpus[];
+  motifs: readonly HeroMotif[];
   dominants: HeroSkill[];
   appeals: HeroSkill[];
+}
+
+export interface SkillStatModifier {
+  skillId: string;
+  stat: SkillStatKind;
+  appliedBonus: number;
 }
 
 export interface SkillDrawOrder {

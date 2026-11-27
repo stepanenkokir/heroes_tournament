@@ -1,7 +1,82 @@
 import { createSeededRng, fnv1aHash } from "./rng";
-import type { DisputeSide } from "./types";
+import type {
+  DisputeSide,
+  HeroDefinition,
+  TournamentFieldKind,
+  TournamentThemeId
+} from "./types";
 
 export type GroupCode = string; // "A" | "B" | "C" | "D" ...
+
+export const TOURNAMENT_THEME_IDS: readonly TournamentThemeId[] = [
+  "myth_bylina",
+  "road_sea",
+  "tricksters",
+  "direct_argument"
+] as const;
+
+export function matchesTournamentTheme(
+  hero: HeroDefinition,
+  themeId: TournamentThemeId
+): boolean {
+  switch (themeId) {
+    case "myth_bylina":
+      return hero.corpora.some(
+        (c) => c === "hellenic" || c === "norse" || c === "slavic" || c === "chivalry"
+      );
+    case "road_sea":
+      return hero.motifs.includes("voyage");
+    case "tricksters":
+      return hero.motifs.includes("trickster");
+    case "direct_argument":
+      return (
+        (hero.motifs.includes("reason") || hero.motifs.includes("honor")) &&
+        !hero.motifs.includes("trickster")
+      );
+  }
+}
+
+export function getEligibleHeroesForTheme(
+  roster: readonly HeroDefinition[],
+  fieldKind: TournamentFieldKind,
+  themeId: TournamentThemeId | null = null
+): HeroDefinition[] {
+  if (fieldKind === "open" || !themeId) {
+    return [...roster];
+  }
+  return roster.filter((hero) => matchesTournamentTheme(hero, themeId));
+}
+
+export function selectTournamentField(
+  entrants: readonly TournamentEntrant[],
+  heroById: ReadonlyMap<string, HeroDefinition>,
+  options: {
+    fieldKind: TournamentFieldKind;
+    themeId?: TournamentThemeId | null;
+    seed: string;
+    fieldSize?: number;
+  }
+): TournamentEntrant[] {
+  const { fieldKind, themeId = null, seed, fieldSize = 16 } = options;
+  const eligible = entrants
+    .filter((entrant) => {
+      if (fieldKind === "open" || !themeId) {
+        return true;
+      }
+      const hero = heroById.get(entrant.heroId);
+      return hero ? matchesTournamentTheme(hero, themeId) : false;
+    })
+    .sort((a, b) => a.heroId.localeCompare(b.heroId));
+
+  if (eligible.length < fieldSize) {
+    throw new Error(
+      `Theme ${themeId ?? "open"} has only ${eligible.length} eligible heroes (need at least ${fieldSize})`
+    );
+  }
+
+  const rng = createSeededRng(`${seed}:field:${fieldKind}:${themeId ?? "open"}`);
+  return rng.shuffle(eligible).slice(0, fieldSize);
+}
 
 export interface TournamentEntrant {
   heroId: string;
