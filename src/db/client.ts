@@ -230,6 +230,22 @@ CREATE TABLE IF NOT EXISTS dispute_commentaries (
   model_tag TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS telegram_subscribers (
+  chat_id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  username TEXT,
+  display_name TEXT NOT NULL,
+  notify_enabled INTEGER NOT NULL DEFAULT 1,
+  linked_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS telegram_outbound (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  dispute_id TEXT NOT NULL,
+  sent_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_disputes_tournament ON disputes(tournament_id, day_offset, match_order);
 CREATE INDEX IF NOT EXISTS idx_rating_events_hero ON rating_events(hero_id, sequence);
 CREATE INDEX IF NOT EXISTS idx_rating_events_dispute ON rating_events(dispute_id);
