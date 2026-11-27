@@ -1,4 +1,5 @@
 import { EMBLEM_DESCRIPTORS } from "@/domain/emblems";
+import { heroMonogram } from "@/domain/monogram";
 
 interface HeroEmblemProps {
   emblemKey: string;
@@ -65,7 +66,7 @@ export function HeroEmblem({
           />
         ) : null}
       </svg>
-      <span className="hero-emblem__monogram">{descriptor.monogram}</span>
+      <span className="hero-emblem__monogram">{heroMonogram(name)}</span>
     </div>
   );
 }
