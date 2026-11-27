@@ -26,6 +26,9 @@ export function CabinetClient({ cabinet, openDisputes }: CabinetClientProps) {
   const [authLoading, setAuthLoading] = useState(false);
 
   const [proposalKind, setProposalKind] = useState<"hero" | "skill">("hero");
+  const [targetHeroId, setTargetHeroId] = useState<string>(
+    cabinet.allHeroes[0]?.id ?? "odysseus"
+  );
   const [proposedName, setProposedName] = useState("");
   const [originOrDomain, setOriginOrDomain] = useState("");
   const [description, setDescription] = useState("");
@@ -74,6 +77,7 @@ export function CabinetClient({ cabinet, openDisputes }: CabinetClientProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         kind: proposalKind,
+        targetHeroId: proposalKind === "skill" ? targetHeroId : null,
         proposedName,
         originOrDomain,
         description,
@@ -338,6 +342,27 @@ export function CabinetClient({ cabinet, openDisputes }: CabinetClientProps) {
                       <option value="hero">{messages.cabinet.proposalKindHero}</option>
                       <option value="skill">{messages.cabinet.proposalKindSkill}</option>
                     </select>
+                    {proposalKind === "skill" ? (
+                      <select
+                        value={targetHeroId}
+                        onChange={(e) => setTargetHeroId(e.target.value)}
+                        style={{
+                          padding: "0.5rem",
+                          borderRadius: "6px",
+                          border: "1px solid var(--border-warm)",
+                          background: "var(--parchment-bright)"
+                        }}
+                      >
+                        {cabinet.allHeroes.map((h) => {
+                          const locH = localizeHero(h, locale);
+                          return (
+                            <option key={h.id} value={h.id}>
+                              {locH.name}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    ) : null}
                     <input
                       type="text"
                       value={proposedName}

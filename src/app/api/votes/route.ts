@@ -3,11 +3,11 @@ import { NextResponse } from "next/server";
 import { getGlobalDbBundle } from "@/db/client";
 import { castDisputeBallot } from "@/db/engine";
 import type { SkillStatKind } from "@/domain";
-import { USER_COOKIE } from "@/auth-cookie";
+import { USER_COOKIE, verifyUserSession } from "@/auth-cookie";
 
 export async function POST(request: Request) {
   const cookieStore = await cookies();
-  const userId = cookieStore.get(USER_COOKIE)?.value;
+  const userId = verifyUserSession(cookieStore.get(USER_COOKIE)?.value);
 
   if (!userId) {
     return NextResponse.json(

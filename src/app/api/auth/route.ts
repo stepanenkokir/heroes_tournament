@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { USER_COOKIE } from "@/auth-cookie";
+import { USER_COOKIE, signUserSession, verifyUserSession } from "@/auth-cookie";
 import { getGlobalDbBundle } from "@/db/client";
 import { upsertOAuthUser } from "@/db/engine";
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const provider =
     body.provider === "google" || body.provider === "vk" ? body.provider : "telegram";
-  const currentUserId = cookieStore.get(USER_COOKIE)?.value;
+  const currentUserId = verifyUserSession(cookieStore.get(USER_COOKIE)?.value) ?? undefined;
   const cleanHandle = (body.handle ?? "").trim() || `${provider}_reader`;
   const cleanName = (body.displayName ?? "").trim() || cleanHandle;
   const providerAccountId = cleanHandle.toLowerCase().replace(/[^a-z0-9_@.-]/gi, "_");
@@ -35,9 +35,9 @@ export async function POST(request: Request) {
     userId: currentUserId
   });
 
-  cookieStore.set(USER_COOKIE, user.id, {
+  cookieStore.set(USER_COOKIE, signUserSession(user.id), {
     path: "/",
-    httpOnly: false,
+    httpOnly: true,
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 180
   });

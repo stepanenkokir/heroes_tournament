@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { USER_COOKIE } from "@/auth-cookie";
+import { USER_COOKIE, verifyUserSession } from "@/auth-cookie";
 import { DomainBadge } from "@/components/DomainBadge";
 import { HeroEmblem } from "@/components/HeroEmblem";
 import { VotePanel } from "@/components/VotePanel";
@@ -23,7 +23,7 @@ export default async function DisputeProtocolPage({
   const messages = getMessages(locale);
   const { id } = await params;
   const data = getDisputeProtocolView(decodeURIComponent(id));
-  const isSignedIn = Boolean((await cookies()).get(USER_COOKIE)?.value);
+  const isSignedIn = Boolean(verifyUserSession((await cookies()).get(USER_COOKIE)?.value));
 
   if (!data) {
     notFound();

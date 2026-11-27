@@ -21,7 +21,7 @@ npm run seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Seeding writes `data/heroes-tournament.db` (gitignored) for today's Moscow date: three finished cups and one cup in progress. Re-run `npm run seed` any day to rebuild the file from the roster and the edition seeds. The dev server reads that file; restart it after a reseed if a page still shows the previous day.
+Open [http://localhost:3000](http://localhost:3000). Seeding writes `data/heroes-tournament.db` (gitignored) for today's Moscow date: ten finished cups (`cup-1` .. `cup-10`, alternating open and themed draws from the 50-hero public-domain pool) and one active cup (`cup-11`) in progress. Re-run `npm run seed` any day to rebuild the file from the roster and the edition seeds. The dev server reads that file; restart it after a reseed if a page still shows the previous day.
 
 ```bash
 npm test
@@ -69,7 +69,8 @@ schtasks /Create /SC DAILY /TN "HeroesTournamentAdvance" /TR "cmd /c cd /d C:\Pr
 | `/heroes/[slug]` | Hero, five dominants, five appeals, record |
 | `/disputes/[id]` | Full protocol: exchanges, acclaim, retention, Elo delta |
 | `/ratings` | Running Elo table and the proof ledger |
-| `/rules` | Formula, domain ring, tournament format |
+| `/cabinet` | OAuth sign-in, crowd ballots, reputation, achievements, and seasonal proposal form |
+| `/rules` | Formula, domain ring, tournament format, public-domain & legal policy |
 
 Locale is chosen from the `ht-locale` cookie, then `Accept-Language`, then Russian. The language switch posts to `POST /api/locale`.
 
@@ -113,7 +114,7 @@ retention = round(min(press * jitter, hold))
 
 Elo starts at 1500 and continues across cups. K is 20 in groups, 28 in the quarterfinals and semifinals, and 36 in the final. Expected score is the standard logistic curve with divisor 400. Every update is stored as a rating event so the ledger can be recomputed and checked.
 
-The default seed builds four editions relative to today (`src/db/engine.ts`, `buildDefaultTournamentSpecs`): three completed cups and the current cup, which is two days in. Edition seeds are fixed strings, so the same calendar date always rebuilds the same database.
+The default seed builds eleven editions relative to today (`src/db/engine.ts`, `buildDefaultTournamentSpecs`): ten completed cups and the current eleventh cup, which is two days in. Each edition draws 16 entrants from the 50-hero pool (open draw or themed draw: Myth & Bylina, Road & Sea, Tricksters, Direct Argument). Edition seeds are fixed strings, so the same calendar date always rebuilds the same database.
 
 ## Layout
 

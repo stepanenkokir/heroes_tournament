@@ -17,7 +17,10 @@ export async function GET(request: Request) {
 
   const cardView = disputeId
     ? getDisputeProtocolView(disputeId)?.card
-    : getHomePortalData().todayDisputes[0] ?? getHomePortalData().upcomingVotingDisputes[0];
+    : (() => {
+        const home = getHomePortalData();
+        return home.todayDisputes[0] ?? home.upcomingVotingDisputes[0];
+      })();
 
   if (!cardView || !cardView.heroA || !cardView.heroB) {
     return NextResponse.json({ ok: false, error: "No active dispute card found" }, { status: 404 });

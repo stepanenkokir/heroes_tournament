@@ -399,6 +399,11 @@ export function castDisputeBallot(
   const nowIso = input.nowIso ?? getMoscowTodayIso();
   const weight: VoteWeight = input.weight === 2 ? 2 : 1;
 
+  const user = db.select().from(usersTable).where(eq(usersTable.id, input.userId)).get();
+  if (!user) {
+    throw new Error("Registered user not found");
+  }
+
   const dispute = db
     .select()
     .from(disputesTable)
@@ -557,6 +562,9 @@ export function submitUserProposal(
 
   if (!input.publicDomainAttested || !input.licenseGranted) {
     throw new Error("Both public domain attestation and license grant are required");
+  }
+  if (input.kind === "skill" && (!input.targetHeroId || !HERO_BY_ID.has(input.targetHeroId))) {
+    throw new Error("Valid target hero is required for skill proposal");
   }
 
   const user = db.select().from(usersTable).where(eq(usersTable.id, input.userId)).get();
