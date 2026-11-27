@@ -24,6 +24,7 @@ export const ru: Messages = {
     timezone: "Часовой пояс расписания и закрытия дня: Europe/Moscow"
   },
   locale: { label: "Язык интерфейса" },
+  theme: { label: "Тема оформления", light: "Светлая тема", dark: "Тёмная тема" },
   home: {
     kicker: "Анонс дня · {date} · Europe/Moscow",
     title: "Сегодняшние диспуты: навыки открыты, итог откроется завтра",

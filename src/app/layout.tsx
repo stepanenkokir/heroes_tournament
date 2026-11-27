@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { getMessages } from "@/i18n/dictionaries";
 import { LocaleProvider } from "@/i18n/locale-context";
 import { getLocale, getRequestPath } from "@/i18n/server";
+import { THEME_COOKIE, parseTheme } from "@/theme";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -22,9 +25,10 @@ export default async function RootLayout({
   const locale = await getLocale();
   const nextPath = await getRequestPath();
   const messages = getMessages(locale);
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
 
   return (
-    <html lang={locale}>
+    <html lang={locale} data-theme={theme}>
       <body>
         <LocaleProvider locale={locale}>
           <header className="site-header">
@@ -38,6 +42,12 @@ export default async function RootLayout({
               </Link>
 
               <div className="site-header__tools">
+                <ThemeSwitcher
+                  theme={theme}
+                  label={messages.theme.label}
+                  lightLabel={messages.theme.light}
+                  darkLabel={messages.theme.dark}
+                />
                 <LocaleSwitcher locale={locale} nextPath={nextPath} />
                 <nav className="site-nav" aria-label={messages.nav.aria}>
                   <Link href="/" className="site-nav__link">

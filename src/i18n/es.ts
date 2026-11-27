@@ -24,6 +24,7 @@ export const es: Messages = {
     timezone: "Zona horaria del calendario y del cierre del día: Europe/Moscow"
   },
   locale: { label: "Idioma de la interfaz" },
+  theme: { label: "Tema de color", light: "Tema claro", dark: "Tema oscuro" },
   home: {
     kicker: "Cartel del día · {date} · Europe/Moscow",
     title: "Disputas de hoy: las habilidades están abiertas, el resultado llega mañana",

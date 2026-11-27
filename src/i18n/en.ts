@@ -24,6 +24,7 @@ export const en: Messages = {
     timezone: "Schedule and day-close timezone: Europe/Moscow"
   },
   locale: { label: "Interface language" },
+  theme: { label: "Color theme", light: "Light theme", dark: "Dark theme" },
   home: {
     kicker: "Today's card · {date} · Europe/Moscow",
     title: "Today's disputes: skills are open, the result arrives tomorrow",

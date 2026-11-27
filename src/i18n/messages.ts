@@ -18,6 +18,7 @@ export interface Messages {
   };
   footer: { line: string; timezone: string };
   locale: { label: string };
+  theme: { label: string; light: string; dark: string };
   home: {
     kicker: string;
     title: string;
