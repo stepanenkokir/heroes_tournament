@@ -2,8 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DomainBadge } from "@/components/DomainBadge";
 import { HeroEmblem } from "@/components/HeroEmblem";
-import { formatRussianDate } from "@/db/dates";
-import { getDisputeProtocolView, getStageRussianLabel } from "@/db/queries";
+import { formatLocaleDate } from "@/db/dates";
+import { getDisputeProtocolView } from "@/db/queries";
+import { getMessages } from "@/i18n/dictionaries";
+import { fill } from "@/i18n/locale";
+import { localizeHero, localizeSkill, localizeSourceLabel, localizeTournament, stageLabel } from "@/i18n/present";
+import { getLocale } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,23 +16,32 @@ export default async function DisputeProtocolPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const locale = await getLocale();
+  const messages = getMessages(locale);
   const { id } = await params;
-  const decodedId = decodeURIComponent(id);
-  const data = getDisputeProtocolView(decodedId);
+  const data = getDisputeProtocolView(decodeURIComponent(id));
 
   if (!data) {
     notFound();
   }
 
-  const { card, exchanges, eloA, eloB } = data;
-  const { dispute, tournament, heroA, heroB, announcedA, announcedB } = card;
-  const stageLabel = getStageRussianLabel(dispute.stage, dispute.groupCode);
-  const tournamentHref =
-    tournament.status === "active" ? "/tournament" : `/tournaments/${tournament.slug}`;
+  const { exchanges, eloA, eloB } = data;
+  const dispute = data.card.dispute;
+  const tournament = localizeTournament(data.card.tournament, locale);
+  const heroA = data.card.heroA ? localizeHero(data.card.heroA, locale) : null;
+  const heroB = data.card.heroB ? localizeHero(data.card.heroB, locale) : null;
+  const stageText = stageLabel(dispute.stage, dispute.groupCode, messages);
+  const tournamentHref = tournament.status === "active" ? "/tournament" : `/tournaments/${tournament.slug}`;
+  const mainExchanges = exchanges.filter((item) => item.row.phase === "main");
+  const sealedExchanges = exchanges.filter((item) => item.row.phase === "sealed_extra");
+  const decisiveExchanges = exchanges.filter((item) => item.row.phase === "decisive");
 
-  const mainExchanges = exchanges.filter((e) => e.row.phase === "main");
-  const sealedExchanges = exchanges.filter((e) => e.row.phase === "sealed_extra");
-  const decisiveExchanges = exchanges.filter((e) => e.row.phase === "decisive");
+  const statusLabel =
+    dispute.status === "completed"
+      ? messages.dispute.closed
+      : dispute.status === "announced"
+        ? messages.dispute.announced
+        : messages.dispute.scheduled;
 
   return (
     <div>
@@ -39,16 +52,14 @@ export default async function DisputeProtocolPage({
               ← {tournament.title}
             </Link>
             <span className="page-hero__kicker">
-              {stageLabel} · День {dispute.dayOffset + 1} ({formatRussianDate(dispute.scheduledDate)})
+              {fill(messages.dispute.dayLine, {
+                stage: stageText,
+                day: dispute.dayOffset + 1,
+                date: formatLocaleDate(dispute.scheduledDate, locale, "long")
+              })}
             </span>
           </div>
-          <span className={`status-pill status-pill--${dispute.status}`}>
-            {dispute.status === "completed"
-              ? "Протокол закрыт и заверен"
-              : dispute.status === "announced"
-                ? "Анонс дня · Итог откроется завтра"
-                : "Запланированный диспут"}
-          </span>
+          <span className={`status-pill status-pill--${dispute.status}`}>{statusLabel}</span>
         </div>
 
         <div
@@ -63,38 +74,27 @@ export default async function DisputeProtocolPage({
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             {heroA ? (
               <>
-                <HeroEmblem
-                  emblemKey={heroA.emblemKey}
-                  accentHex={heroA.accentHex}
-                  name={heroA.name}
-                  size="lg"
-                />
+                <HeroEmblem emblemKey={heroA.emblemKey} accentHex={heroA.accentHex} name={heroA.name} size="lg" />
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)", fontWeight: 700 }}>
-                    СТОРОНА A · {heroA.origin}
+                    {fill(messages.dispute.sideA, { origin: heroA.origin })}
                   </div>
                   <Link
                     href={`/heroes/${heroA.slug}`}
-                    style={{
-                      fontFamily: "var(--font-serif)",
-                      fontSize: "1.65rem",
-                      fontWeight: 700
-                    }}
+                    style={{ fontFamily: "var(--font-serif)", fontSize: "1.65rem", fontWeight: 700 }}
                   >
                     {heroA.name}
                   </Link>
-                  <div style={{ fontSize: "0.88rem", color: "var(--ink-soft)" }}>
-                    {heroA.epithet}
-                  </div>
+                  <div style={{ fontSize: "0.88rem", color: "var(--ink-soft)" }}>{heroA.epithet}</div>
                 </div>
               </>
             ) : (
               <div>
                 <div style={{ fontSize: "0.76rem", color: "var(--gold-seal)", fontWeight: 700 }}>
-                  ОЖИДАНИЕ СОПЕРНИКА (A)
+                  {messages.dispute.waitingA}
                 </div>
                 <div style={{ fontFamily: "var(--font-serif)", fontSize: "1.3rem" }}>
-                  {dispute.sourceLabelA ?? "Победитель пары"}
+                  {localizeSourceLabel(dispute.sourceLabelA, locale, messages)}
                 </div>
               </div>
             )}
@@ -108,9 +108,12 @@ export default async function DisputeProtocolPage({
                   <span className="dispute-card__score-colon">:</span>
                   <span>{dispute.acclaimB}</span>
                 </div>
-                <div className="dispute-card__score-caption">сумма признания</div>
+                <div className="dispute-card__score-caption">{messages.dispute.acclaimSum}</div>
                 <div className="dispute-card__retention tabular-nums" style={{ fontSize: "0.82rem" }}>
-                  Удержание: {dispute.retentionA} — {dispute.retentionB}
+                  {fill(messages.dispute.retention, {
+                  a: dispute.retentionA ?? 0,
+                  b: dispute.retentionB ?? 0
+                })}
                 </div>
               </>
             ) : (
@@ -126,7 +129,7 @@ export default async function DisputeProtocolPage({
                   — : —
                 </div>
                 <div className="dispute-card__score-caption">
-                  {dispute.status === "announced" ? "итог завтра" : "в расписании"}
+                  {dispute.status === "announced" ? messages.dispute.resultTomorrow : messages.dispute.onSchedule}
                 </div>
               </>
             )}
@@ -145,36 +148,25 @@ export default async function DisputeProtocolPage({
               <>
                 <div>
                   <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)", fontWeight: 700 }}>
-                    СТОРОНА B · {heroB.origin}
+                    {fill(messages.dispute.sideB, { origin: heroB.origin })}
                   </div>
                   <Link
                     href={`/heroes/${heroB.slug}`}
-                    style={{
-                      fontFamily: "var(--font-serif)",
-                      fontSize: "1.65rem",
-                      fontWeight: 700
-                    }}
+                    style={{ fontFamily: "var(--font-serif)", fontSize: "1.65rem", fontWeight: 700 }}
                   >
                     {heroB.name}
                   </Link>
-                  <div style={{ fontSize: "0.88rem", color: "var(--ink-soft)" }}>
-                    {heroB.epithet}
-                  </div>
+                  <div style={{ fontSize: "0.88rem", color: "var(--ink-soft)" }}>{heroB.epithet}</div>
                 </div>
-                <HeroEmblem
-                  emblemKey={heroB.emblemKey}
-                  accentHex={heroB.accentHex}
-                  name={heroB.name}
-                  size="lg"
-                />
+                <HeroEmblem emblemKey={heroB.emblemKey} accentHex={heroB.accentHex} name={heroB.name} size="lg" />
               </>
             ) : (
               <div>
                 <div style={{ fontSize: "0.76rem", color: "var(--gold-seal)", fontWeight: 700 }}>
-                  ОЖИДАНИЕ СОПЕРНИКА (B)
+                  {messages.dispute.waitingB}
                 </div>
                 <div style={{ fontFamily: "var(--font-serif)", fontSize: "1.3rem" }}>
-                  {dispute.sourceLabelB ?? "Победитель пары"}
+                  {localizeSourceLabel(dispute.sourceLabelB, locale, messages)}
                 </div>
               </div>
             )}
@@ -195,50 +187,49 @@ export default async function DisputeProtocolPage({
             color: "var(--ink-muted)"
           }}
         >
-          <span style={{ fontFamily: "var(--font-mono)" }}>seed протокола: {dispute.seed}</span>
+          <span style={{ fontFamily: "var(--font-mono)" }}>
+            {fill(messages.common.protocolSeed, { seed: dispute.seed })}
+          </span>
           <span>
             {dispute.status === "completed"
               ? dispute.winnerSide === "A"
-                ? `Победа в диспуте: ${heroA?.name}`
+                ? fill(messages.dispute.winner, { name: heroA?.name ?? "" })
                 : dispute.winnerSide === "B"
-                  ? `Победа в диспуте: ${heroB?.name}`
-                  : "Равенство признания · Ничья в группе"
-              : "Итог откроется завтра (00:00 Europe/Moscow)"}
+                  ? fill(messages.dispute.winner, { name: heroB?.name ?? "" })
+                  : messages.dispute.draw
+              : messages.dispute.opensTomorrow}
           </span>
         </div>
       </section>
 
-      {/* Анонсированные навыки */}
-      {announcedA.length > 0 && announcedB.length > 0 ? (
+      {data.card.announcedA.length > 0 && data.card.announcedB.length > 0 ? (
         <section className="section-block">
           <div className="section-header">
             <div>
-              <h2 className="section-title">Вытянутые навыки на диспут (2 открытых + 1 запечатанный)</h2>
-              <p className="section-subtitle">
-                Слоты 1 и 2 участвуют в четырёх основных обменах. Слот 3 запечатан и вскрывается
-                только при ничьей в плей-офф.
-              </p>
+              <h2 className="section-title">{messages.dispute.drawnTitle}</h2>
+              <p className="section-subtitle">{messages.dispute.drawnSubtitle}</p>
             </div>
           </div>
 
           <div className="cards-grid-2">
-            {[
-              { side: "A" as const, hero: heroA, list: announcedA },
-              { side: "B" as const, hero: heroB, list: announcedB }
-            ].map(({ side, hero, list }) => (
+            {(
+              [
+                ["A", heroA, data.card.announcedA],
+                ["B", heroB, data.card.announcedB]
+              ] as const
+            ).map(([side, hero, list]) => (
               <div key={side} className="group-card">
                 <div className="group-card__header">
                   <h3 className="group-card__title">
-                    Набор стороны {side} · {hero?.name}
+                    {fill(messages.dispute.sideKit, { side, name: hero?.name ?? "" })}
                   </h3>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                   {list.map((pair, idx) => {
                     const hideSealedDetails =
-                      pair.isSealed &&
-                      dispute.status !== "completed" &&
-                      !dispute.sealedUsed;
-
+                      pair.isSealed && dispute.status !== "completed" && !dispute.sealedUsed;
+                    const dominant = localizeSkill(pair.dominant, locale);
+                    const appeal = localizeSkill(pair.appeal, locale);
                     return (
                       <div
                         key={pair.slotIndex}
@@ -260,34 +251,32 @@ export default async function DisputeProtocolPage({
                         >
                           {pair.isSealed
                             ? dispute.sealedUsed
-                              ? `Слот ${side}3 · Сургучная печать вскрыта (овертайм плей-офф)`
-                              : `Слот ${side}3 · Запечатанный резерв плей-офф`
-                            : `Открытый слот ${side}${idx + 1}`}
+                              ? fill(messages.dispute.sealOpened, { side })
+                              : fill(messages.dispute.sealClosed, { side })
+                            : fill(messages.dispute.openSlot, { side, n: idx + 1 })}
                         </div>
-
                         {hideSealedDetails ? (
                           <div style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
-                            Навык вытянут детерминированным жребием и хранится под печатью на случай
-                            равенства после четырёх обменов.
+                            {messages.dispute.sealedBody}
                           </div>
                         ) : (
                           <div className="announced-pair" style={{ marginBottom: 0 }}>
                             <div className="announced-skill announced-skill--dominant">
-                              <span className="announced-skill__tag">Доминанта</span>
-                              <strong>{pair.dominant.title}</strong>
-                              <DomainBadge domain={pair.dominant.domain} compact />
+                              <span className="announced-skill__tag">{messages.common.dominant}</span>
+                              <strong>{dominant.title}</strong>
+                              <DomainBadge domain={dominant.domain} compact />
                               <span className="announced-skill__stats tabular-nums">
-                                Острота {pair.dominant.primaryStat} · Глубина{" "}
-                                {pair.dominant.secondaryStat}
+                                {messages.common.sharpness} {dominant.primaryStat} · {messages.common.depth}{" "}
+                                {dominant.secondaryStat}
                               </span>
                             </div>
                             <div className="announced-skill announced-skill--appeal">
-                              <span className="announced-skill__tag">Апелляция</span>
-                              <strong>{pair.appeal.title}</strong>
-                              <DomainBadge domain={pair.appeal.domain} compact />
+                              <span className="announced-skill__tag">{messages.common.appeal}</span>
+                              <strong>{appeal.title}</strong>
+                              <DomainBadge domain={appeal.domain} compact />
                               <span className="announced-skill__stats tabular-nums">
-                                Твёрдость {pair.appeal.primaryStat} · Находчивость{" "}
-                                {pair.appeal.secondaryStat}
+                                {messages.common.firmness} {appeal.primaryStat} · {messages.common.wit}{" "}
+                                {appeal.secondaryStat}
                               </span>
                             </div>
                           </div>
@@ -302,100 +291,101 @@ export default async function DisputeProtocolPage({
         </section>
       ) : null}
 
-      {/* Если диспут в статусе announced или scheduled */}
       {dispute.status !== "completed" ? (
         <section className="section-block">
           <div className="rule-card">
             <h3>
               {dispute.status === "announced"
-                ? "Диспут открыт: итог откроется завтра"
-                : "Диспут ожидает своей очереди в календаре"}
+                ? messages.dispute.openTomorrowTitle
+                : messages.dispute.waitingTitle}
             </h3>
             <p style={{ color: "var(--ink-soft)" }}>
               {dispute.status === "announced"
-                ? "Навыки сегодняшнего состязания уже объявлены и доступны для анализа. По регламенту турнира расчёт четырёх обменов и пересчёт рейтинга Эло происходят при смене суток (Europe/Moscow)."
-                : `Этот диспут назначен на ${formatRussianDate(dispute.scheduledDate)}. В день встречи портал откроет две пары навыков каждого участника.`}
+                ? messages.dispute.openTomorrowBody
+                : fill(messages.dispute.waitingBody, {
+                    date: formatLocaleDate(dispute.scheduledDate, locale, "long")
+                  })}
             </p>
           </div>
         </section>
       ) : null}
 
-      {/* Пошаговый протокол для завершённого диспута */}
       {dispute.status === "completed" ? (
         <>
           <section className="section-block">
             <div className="section-header">
               <div>
-                <h2 className="section-title">Основная серия: четыре обмена</h2>
-                <p className="section-subtitle">
-                  1) Доминанта A1 — Апелляция B1 · 2) Доминанта B1 — Апелляция A1 · 3) Доминанта A2 —
-                  Апелляция B2 · 4) Доминанта B2 — Апелляция A2
-                </p>
+                <h2 className="section-title">{messages.dispute.mainTitle}</h2>
+                <p className="section-subtitle">{messages.dispute.mainSubtitle}</p>
               </div>
             </div>
-
             <div className="exchange-list">
-              {mainExchanges.map((ex) => {
-                const attackerHero = ex.row.attackerSide === "A" ? heroA : heroB;
-                const defenderHero = ex.row.defenderSide === "A" ? heroA : heroB;
+              {mainExchanges.map((exchange) => {
+                const attackerHero = exchange.row.attackerSide === "A" ? heroA : heroB;
+                const defenderHero = exchange.row.defenderSide === "A" ? heroA : heroB;
+                const dominant = localizeSkill(exchange.dominantSkill, locale);
+                const appeal = localizeSkill(exchange.appealSkill, locale);
                 const affinityLabel =
-                  ex.row.affinity > 1
-                    ? "Домен одолевает (×1.2)"
-                    : ex.row.affinity < 1
-                      ? "Домен уступает (×0.8)"
-                      : "Нейтральные домены (×1.0)";
-
+                  exchange.row.affinity > 1
+                    ? messages.dispute.affinityWin
+                    : exchange.row.affinity < 1
+                      ? messages.dispute.affinityLose
+                      : messages.dispute.affinityEven;
                 return (
-                  <article key={ex.row.step} className="exchange-step">
+                  <article key={exchange.row.step} className="exchange-step">
                     <div className="exchange-step__header">
                       <span className="exchange-step__badge">
-                        Обмен #{ex.row.step} · Доминанта {ex.row.attackerSide} → Апелляция{" "}
-                        {ex.row.defenderSide}
+                        {fill(messages.dispute.exchange, {
+                          step: exchange.row.step,
+                          attack: exchange.row.attackerSide,
+                          defend: exchange.row.defenderSide
+                        })}
                       </span>
                       <span className="exchange-step__formula-meta tabular-nums">
-                        {affinityLabel} · j = {ex.row.jitter.toFixed(4)} · press·j ={" "}
-                        {ex.row.effectivePress.toFixed(1)} против hold = {ex.row.rawHold.toFixed(1)}
+                        {fill(messages.dispute.versusHold, {
+                          affinity: affinityLabel,
+                          jitter: exchange.row.jitter.toFixed(4),
+                          press: exchange.row.effectivePress.toFixed(1),
+                          hold: exchange.row.rawHold.toFixed(1)
+                        })}
                       </span>
                     </div>
-
                     <div className="exchange-step__body">
                       <div className="skill-box skill-box--dominant">
                         <span className="skill-box__role">
-                          Доминанта ({attackerHero?.name})
+                          {fill(messages.dispute.dominantOf, { name: attackerHero?.name ?? "" })}
                         </span>
-                        <div className="skill-box__title">{ex.dominantSkill.title}</div>
-                        <p className="skill-box__desc">{ex.dominantSkill.description}</p>
+                        <div className="skill-box__title">{dominant.title}</div>
+                        <p className="skill-box__desc">{dominant.description}</p>
                         <div className="skill-box__footer tabular-nums">
-                          <DomainBadge domain={ex.dominantSkill.domain} compact />
+                          <DomainBadge domain={dominant.domain} compact />
                           <span>
-                            Острота {ex.dominantSkill.primaryStat} · Глубина{" "}
-                            {ex.dominantSkill.secondaryStat}
+                            {messages.common.sharpness} {dominant.primaryStat} · {messages.common.depth}{" "}
+                            {dominant.secondaryStat}
                           </span>
                         </div>
                       </div>
-
                       <div className="exchange-outcome-box tabular-nums">
                         <div className="outcome-metric">
-                          <span>Признание ({attackerHero?.name}):</span>
-                          <span className="outcome-metric__val--acclaim">+{ex.row.acclaim}</span>
+                          <span>{fill(messages.dispute.acclaimOf, { name: attackerHero?.name ?? "" })}</span>
+                          <span className="outcome-metric__val--acclaim">+{exchange.row.acclaim}</span>
                         </div>
                         <div className="outcome-metric">
-                          <span>Удержание ({defenderHero?.name}):</span>
-                          <span className="outcome-metric__val--retention">{ex.row.retention}</span>
+                          <span>{fill(messages.dispute.retentionOf, { name: defenderHero?.name ?? "" })}</span>
+                          <span className="outcome-metric__val--retention">{exchange.row.retention}</span>
                         </div>
                       </div>
-
                       <div className="skill-box skill-box--appeal">
                         <span className="skill-box__role">
-                          Апелляция ({defenderHero?.name})
+                          {fill(messages.dispute.appealOf, { name: defenderHero?.name ?? "" })}
                         </span>
-                        <div className="skill-box__title">{ex.appealSkill.title}</div>
-                        <p className="skill-box__desc">{ex.appealSkill.description}</p>
+                        <div className="skill-box__title">{appeal.title}</div>
+                        <p className="skill-box__desc">{appeal.description}</p>
                         <div className="skill-box__footer tabular-nums">
-                          <DomainBadge domain={ex.appealSkill.domain} compact />
+                          <DomainBadge domain={appeal.domain} compact />
                           <span>
-                            Твёрдость {ex.appealSkill.primaryStat} · Находчивость{" "}
-                            {ex.appealSkill.secondaryStat}
+                            {messages.common.firmness} {appeal.primaryStat} · {messages.common.wit}{" "}
+                            {appeal.secondaryStat}
                           </span>
                         </div>
                       </div>
@@ -406,74 +396,71 @@ export default async function DisputeProtocolPage({
             </div>
           </section>
 
-          {/* Путь через ничью в плей-офф, если он понадобился */}
           {sealedExchanges.length > 0 ? (
             <section className="section-block">
               <div className="section-header">
                 <div>
-                  <h2 className="section-title">
-                    Снятие печати: третья пара навыков (овертайм плей-офф)
-                  </h2>
-                  <p className="section-subtitle">
-                    После четырёх обменов счёт признания был равным. Вскрыты запечатанные слоты A3 и
-                    B3.
-                  </p>
+                  <h2 className="section-title">{messages.dispute.sealedTitle}</h2>
+                  <p className="section-subtitle">{messages.dispute.sealedSubtitle}</p>
                 </div>
               </div>
-
               <div className="exchange-list">
-                {sealedExchanges.map((ex) => {
-                  const attackerHero = ex.row.attackerSide === "A" ? heroA : heroB;
-                  const defenderHero = ex.row.defenderSide === "A" ? heroA : heroB;
+                {sealedExchanges.map((exchange) => {
+                  const attackerHero = exchange.row.attackerSide === "A" ? heroA : heroB;
+                  const defenderHero = exchange.row.defenderSide === "A" ? heroA : heroB;
+                  const dominant = localizeSkill(exchange.dominantSkill, locale);
+                  const appeal = localizeSkill(exchange.appealSkill, locale);
                   return (
-                    <article key={ex.row.step} className="exchange-step exchange-step--sealed">
+                    <article key={exchange.row.step} className="exchange-step exchange-step--sealed">
                       <div className="exchange-step__header">
                         <span className="exchange-step__badge">
-                          Доп. обмен #{ex.row.step} (Запечатанная пара) · {attackerHero?.name} →{" "}
-                          {defenderHero?.name}
+                          {fill(messages.dispute.extraExchange, {
+                            step: exchange.row.step,
+                            attack: attackerHero?.name ?? "",
+                            defend: defenderHero?.name ?? ""
+                          })}
                         </span>
                         <span className="exchange-step__formula-meta tabular-nums">
-                          affinity ×{ex.row.affinity} · j = {ex.row.jitter.toFixed(4)} · press·j ={" "}
-                          {ex.row.effectivePress.toFixed(1)} · hold = {ex.row.rawHold.toFixed(1)}
+                          affinity ×{exchange.row.affinity} · j = {exchange.row.jitter.toFixed(4)} · press·j ={" "}
+                          {exchange.row.effectivePress.toFixed(1)} · hold = {exchange.row.rawHold.toFixed(1)}
                         </span>
                       </div>
-
                       <div className="exchange-step__body">
                         <div className="skill-box skill-box--dominant">
-                          <span className="skill-box__role">Доминанта ({attackerHero?.name})</span>
-                          <div className="skill-box__title">{ex.dominantSkill.title}</div>
-                          <p className="skill-box__desc">{ex.dominantSkill.description}</p>
+                          <span className="skill-box__role">
+                            {fill(messages.dispute.dominantOf, { name: attackerHero?.name ?? "" })}
+                          </span>
+                          <div className="skill-box__title">{dominant.title}</div>
+                          <p className="skill-box__desc">{dominant.description}</p>
                           <div className="skill-box__footer tabular-nums">
-                            <DomainBadge domain={ex.dominantSkill.domain} compact />
+                            <DomainBadge domain={dominant.domain} compact />
                             <span>
-                              Остр. {ex.dominantSkill.primaryStat} · Глуб.{" "}
-                              {ex.dominantSkill.secondaryStat}
+                              {messages.common.sharpShort} {dominant.primaryStat} · {messages.common.depthShort}{" "}
+                              {dominant.secondaryStat}
                             </span>
                           </div>
                         </div>
-
                         <div className="exchange-outcome-box tabular-nums">
                           <div className="outcome-metric">
-                            <span>Признание:</span>
-                            <span className="outcome-metric__val--acclaim">+{ex.row.acclaim}</span>
+                            <span>{messages.dispute.acclaim}</span>
+                            <span className="outcome-metric__val--acclaim">+{exchange.row.acclaim}</span>
                           </div>
                           <div className="outcome-metric">
-                            <span>Удержание:</span>
-                            <span className="outcome-metric__val--retention">
-                              {ex.row.retention}
-                            </span>
+                            <span>{messages.dispute.retentionPlain}</span>
+                            <span className="outcome-metric__val--retention">{exchange.row.retention}</span>
                           </div>
                         </div>
-
                         <div className="skill-box skill-box--appeal">
-                          <span className="skill-box__role">Апелляция ({defenderHero?.name})</span>
-                          <div className="skill-box__title">{ex.appealSkill.title}</div>
-                          <p className="skill-box__desc">{ex.appealSkill.description}</p>
+                          <span className="skill-box__role">
+                            {fill(messages.dispute.appealOf, { name: defenderHero?.name ?? "" })}
+                          </span>
+                          <div className="skill-box__title">{appeal.title}</div>
+                          <p className="skill-box__desc">{appeal.description}</p>
                           <div className="skill-box__footer tabular-nums">
-                            <DomainBadge domain={ex.appealSkill.domain} compact />
+                            <DomainBadge domain={appeal.domain} compact />
                             <span>
-                              Твёрд. {ex.appealSkill.primaryStat} · Находч.{" "}
-                              {ex.appealSkill.secondaryStat}
+                              {messages.common.firmShort} {appeal.primaryStat} · {messages.common.witShort}{" "}
+                              {appeal.secondaryStat}
                             </span>
                           </div>
                         </div>
@@ -490,29 +477,31 @@ export default async function DisputeProtocolPage({
               <div className="section-header">
                 <div>
                   <h2 className="section-title">
-                    Серия решающих доводов ({dispute.decisiveScoreA} : {dispute.decisiveScoreB})
+                    {fill(messages.dispute.decisiveTitle, {
+                      a: dispute.decisiveScoreA,
+                      b: dispute.decisiveScoreB
+                    })}
                   </h2>
-                  <p className="section-subtitle">
-                    Признание ≥ 12 означает, что довод принят судейской коллегией; иначе апелляция
-                    удержала рубеж.
-                  </p>
+                  <p className="section-subtitle">{messages.dispute.decisiveSubtitle}</p>
                 </div>
               </div>
-
               <div className="exchange-list">
-                {decisiveExchanges.map((ex) => {
-                  const attackerHero = ex.row.attackerSide === "A" ? heroA : heroB;
-                  const defenderHero = ex.row.defenderSide === "A" ? heroA : heroB;
+                {decisiveExchanges.map((exchange) => {
+                  const attackerHero = exchange.row.attackerSide === "A" ? heroA : heroB;
+                  const defenderHero = exchange.row.defenderSide === "A" ? heroA : heroB;
                   return (
-                    <article key={ex.row.step} className="exchange-step exchange-step--decisive">
+                    <article key={exchange.row.step} className="exchange-step exchange-step--decisive">
                       <div className="exchange-step__header">
                         <span className="exchange-step__badge">
-                          Решающий довод #{ex.row.step - 6} · {attackerHero?.name} против{" "}
-                          {defenderHero?.name}
+                          {fill(messages.dispute.decisiveBadge, {
+                            n: exchange.row.step - 6,
+                            attack: attackerHero?.name ?? "",
+                            defend: defenderHero?.name ?? ""
+                          })}
                         </span>
                         <span className="exchange-step__formula-meta tabular-nums">
-                          Признание {ex.row.acclaim} (порог 12) →{" "}
-                          {ex.row.decisiveAccepted ? "ДОВОД ПРИНЯТ" : "УДЕРЖАНО"}
+                          {messages.common.acclaim} {exchange.row.acclaim} (≥ 12) →{" "}
+                          {exchange.row.decisiveAccepted ? messages.dispute.accepted : messages.dispute.held}
                         </span>
                       </div>
                     </article>
@@ -526,35 +515,33 @@ export default async function DisputeProtocolPage({
             <section className="section-block">
               <div className="champion-banner">
                 <div>
-                  <div className="champion-banner__label">Жребий славы (Seeded Coin)</div>
+                  <div className="champion-banner__label">{messages.dispute.gloryLabel}</div>
                   <div className="champion-banner__name">
-                    После полного равенства серии победу по честному жребию сида одержала сторона{" "}
-                    {dispute.gloryLotWinner} (
-                    {dispute.gloryLotWinner === "A" ? heroA?.name : heroB?.name}).
+                    {fill(messages.dispute.gloryBody, {
+                      side: dispute.gloryLotWinner ?? "",
+                      name: dispute.gloryLotWinner === "A" ? (heroA?.name ?? "") : (heroB?.name ?? "")
+                    })}
                   </div>
                 </div>
               </div>
             </section>
           ) : null}
 
-          {/* Пруф пересчёта рейтинга Эло */}
           {eloA && eloB ? (
             <section className="section-block">
               <div className="section-header">
                 <div>
-                  <h2 className="section-title">Пруф пересчёта рейтинга Эло по итогам диспута</h2>
-                  <p className="section-subtitle">
-                    Коэффициент стадии K = {eloA.kFactor}. Ожидание E вычислено по классической
-                    формуле Эло до начала обмена.
-                  </p>
+                  <h2 className="section-title">{messages.dispute.eloTitle}</h2>
+                  <p className="section-subtitle">{fill(messages.dispute.eloSubtitle, { k: eloA.kFactor })}</p>
                 </div>
               </div>
-
               <div className="elo-proof-grid">
-                {[
-                  { side: "A", hero: heroA!, ev: eloA },
-                  { side: "B", hero: heroB!, ev: eloB }
-                ].map(({ side, hero, ev }) => (
+                {(
+                  [
+                    ["A", heroA!, eloA],
+                    ["B", heroB!, eloB]
+                  ] as const
+                ).map(([side, hero, event]) => (
                   <div key={side} className="elo-proof-card tabular-nums">
                     <div
                       style={{
@@ -566,28 +553,21 @@ export default async function DisputeProtocolPage({
                     >
                       <Link
                         href={`/heroes/${hero.slug}`}
-                        style={{
-                          fontFamily: "var(--font-serif)",
-                          fontSize: "1.2rem",
-                          fontWeight: 700
-                        }}
+                        style={{ fontFamily: "var(--font-serif)", fontSize: "1.2rem", fontWeight: 700 }}
                       >
                         {hero.name}
                       </Link>
                       <span
                         className={
-                          ev.delta > 0
-                            ? "delta-positive"
-                            : ev.delta < 0
-                              ? "delta-negative"
-                              : "delta-neutral"
+                          event.delta > 0 ? "delta-positive" : event.delta < 0 ? "delta-negative" : "delta-neutral"
                         }
                         style={{ fontSize: "1.15rem" }}
                       >
-                        {ev.delta > 0 ? `+${ev.delta}` : ev.delta} Эло
+                        {fill(messages.dispute.eloDelta, {
+                          delta: event.delta > 0 ? `+${event.delta}` : event.delta
+                        })}
                       </span>
                     </div>
-
                     <div
                       style={{
                         display: "grid",
@@ -601,24 +581,28 @@ export default async function DisputeProtocolPage({
                       }}
                     >
                       <div>
-                        <div style={{ color: "var(--ink-muted)", fontSize: "0.72rem" }}>Рейтинг до</div>
-                        <strong>{ev.ratingBefore}</strong>
+                        <div style={{ color: "var(--ink-muted)", fontSize: "0.72rem" }}>
+                          {messages.dispute.ratingBefore}
+                        </div>
+                        <strong>{event.ratingBefore}</strong>
                       </div>
                       <div>
                         <div style={{ color: "var(--ink-muted)", fontSize: "0.72rem" }}>
-                          Ожидание E
+                          {messages.dispute.expected}
                         </div>
-                        <strong>{ev.expectedScore.toFixed(3)}</strong>
-                      </div>
-                      <div>
-                        <div style={{ color: "var(--ink-muted)", fontSize: "0.72rem" }}>Исход S</div>
-                        <strong>{ev.actualScore}</strong>
+                        <strong>{event.expectedScore.toFixed(3)}</strong>
                       </div>
                       <div>
                         <div style={{ color: "var(--ink-muted)", fontSize: "0.72rem" }}>
-                          Рейтинг после
+                          {messages.dispute.outcome}
                         </div>
-                        <strong>{ev.ratingAfter}</strong>
+                        <strong>{event.actualScore}</strong>
+                      </div>
+                      <div>
+                        <div style={{ color: "var(--ink-muted)", fontSize: "0.72rem" }}>
+                          {messages.dispute.ratingAfter}
+                        </div>
+                        <strong>{event.ratingAfter}</strong>
                       </div>
                     </div>
                   </div>

@@ -1,62 +1,76 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
+import { getMessages } from "@/i18n/dictionaries";
+import { LocaleProvider } from "@/i18n/locale-context";
+import { getLocale, getRequestPath } from "@/i18n/server";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Турнир Героев · Интеллектуальный диспут шести доменов",
-  description:
-    "Спектаторский портал интеллектуального состязания литературных и былинных героев: доминанты, апелляции, групповой этап, плей-офф и рейтинг Эло с пруфами."
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const messages = getMessages(await getLocale());
+  return {
+    title: messages.meta.title,
+    description: messages.meta.description
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const nextPath = await getRequestPath();
+  const messages = getMessages(locale);
+
   return (
-    <html lang="ru">
+    <html lang={locale}>
       <body>
-        <header className="site-header">
-          <div className="site-header__inner">
-            <Link href="/" className="brand-link">
-              <span className="brand-seal">ТГ</span>
-              <span>
-                <span className="brand-title">Турнир Героев</span>
-                <span className="brand-subtitle">Академия риторического диспута</span>
-              </span>
-            </Link>
+        <LocaleProvider locale={locale}>
+          <header className="site-header">
+            <div className="site-header__inner">
+              <Link href="/" className="brand-link">
+                <span className="brand-seal">{messages.brand.seal}</span>
+                <span>
+                  <span className="brand-title">{messages.brand.title}</span>
+                  <span className="brand-subtitle">{messages.brand.subtitle}</span>
+                </span>
+              </Link>
 
-            <nav className="site-nav" aria-label="Основная навигация">
-              <Link href="/" className="site-nav__link">
-                Анонс дня
-              </Link>
-              <Link href="/tournament" className="site-nav__link site-nav__link--accent">
-                Текущий кубок
-              </Link>
-              <Link href="/tournaments" className="site-nav__link">
-                Архив кубков
-              </Link>
-              <Link href="/ratings" className="site-nav__link">
-                Рейтинг и пруфы
-              </Link>
-              <Link href="/rules" className="site-nav__link">
-                Правила и формула
-              </Link>
-            </nav>
-          </div>
-        </header>
-
-        <main className="site-main">{children}</main>
-
-        <footer className="site-footer">
-          <div className="site-footer__inner">
-            <div>
-              <strong>Турнир Героев</strong> · Спектаторский портал интеллектуальных состязаний (16
-              героев, 6 доменов, чистая формула обмена).
+              <div className="site-header__tools">
+                <LocaleSwitcher locale={locale} nextPath={nextPath} />
+                <nav className="site-nav" aria-label={messages.nav.aria}>
+                  <Link href="/" className="site-nav__link">
+                    {messages.nav.today}
+                  </Link>
+                  <Link href="/tournament" className="site-nav__link site-nav__link--accent">
+                    {messages.nav.current}
+                  </Link>
+                  <Link href="/tournaments" className="site-nav__link">
+                    {messages.nav.archive}
+                  </Link>
+                  <Link href="/ratings" className="site-nav__link">
+                    {messages.nav.ratings}
+                  </Link>
+                  <Link href="/rules" className="site-nav__link">
+                    {messages.nav.rules}
+                  </Link>
+                </nav>
+              </div>
             </div>
-            <div>Часовой пояс расписания и закрытия дня: Europe/Moscow</div>
-          </div>
-        </footer>
+          </header>
+
+          <main className="site-main">{children}</main>
+
+          <footer className="site-footer">
+            <div className="site-footer__inner">
+              <div>
+                <strong>{messages.brand.title}</strong> · {messages.footer.line}
+              </div>
+              <div>{messages.footer.timezone}</div>
+            </div>
+          </footer>
+        </LocaleProvider>
       </body>
     </html>
   );

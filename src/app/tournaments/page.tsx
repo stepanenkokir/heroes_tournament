@@ -1,11 +1,17 @@
 import Link from "next/link";
 import { HeroEmblem } from "@/components/HeroEmblem";
-import { formatRussianDate } from "@/db/dates";
+import { formatLocaleDate } from "@/db/dates";
 import { getAllTournamentsSummary } from "@/db/queries";
+import { getMessages } from "@/i18n/dictionaries";
+import { fill } from "@/i18n/locale";
+import { localizeHero, localizeTournament } from "@/i18n/present";
+import { getLocale } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
-export default function AllTournamentsArchivePage() {
+export default async function AllTournamentsArchivePage() {
+  const locale = await getLocale();
+  const messages = getMessages(locale);
   const summaries = getAllTournamentsSummary().sort(
     (a, b) => b.tournament.editionNumber - a.tournament.editionNumber
   );
@@ -14,34 +20,34 @@ export default function AllTournamentsArchivePage() {
     <div>
       <section className="page-hero">
         <div className="page-hero__top-bar">
-          <span className="page-hero__kicker">Летопись состязаний</span>
-          <span className="page-hero__dates">Всего розыгрышей в базе: {summaries.length}</span>
+          <span className="page-hero__kicker">{messages.archive.kicker}</span>
+          <span className="page-hero__dates">
+            {fill(messages.archive.dates, { count: summaries.length })}
+          </span>
         </div>
-        <h1 className="page-hero__title">Турнирные таблицы прошедших и текущих кубков</h1>
-        <p className="page-hero__subtitle">
-          Каждый кубок состоит из группового этапа (4 группы по 4 героя, 24 диспута) и плей-офф из 7
-          диспутов на выбывание. Все протоколы сохранены с детерминированным сидом.
-        </p>
+        <h1 className="page-hero__title">{messages.archive.title}</h1>
+        <p className="page-hero__subtitle">{messages.archive.subtitle}</p>
       </section>
 
       <div className="cards-grid-2">
         {summaries.map(({ tournament, champion, runnerUp }) => {
-          const href =
-            tournament.status === "active" ? "/tournament" : `/tournaments/${tournament.slug}`;
+          const cup = localizeTournament(tournament, locale);
+          const winner = champion ? localizeHero(champion, locale) : null;
+          const finalist = runnerUp ? localizeHero(runnerUp, locale) : null;
+          const href = cup.status === "active" ? "/tournament" : `/tournaments/${cup.slug}`;
           return (
-            <article key={tournament.id} className="group-card">
+            <article key={cup.id} className="group-card">
               <div className="group-card__header">
                 <span
                   className={`status-pill ${
-                    tournament.status === "active"
-                      ? "status-pill--announced"
-                      : "status-pill--completed"
+                    cup.status === "active" ? "status-pill--announced" : "status-pill--completed"
                   }`}
                 >
-                  {tournament.status === "active" ? "Текущий розыгрыш" : "Архивный кубок"}
+                  {cup.status === "active" ? messages.status.currentDraw : messages.status.archivedCup}
                 </span>
                 <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>
-                  {formatRussianDate(tournament.startDate)} — {formatRussianDate(tournament.endDate)}
+                  {formatLocaleDate(cup.startDate, locale, "long")} —{" "}
+                  {formatLocaleDate(cup.endDate, locale, "long")}
                 </span>
               </div>
 
@@ -52,46 +58,46 @@ export default function AllTournamentsArchivePage() {
                   marginBottom: "0.4rem"
                 }}
               >
-                {tournament.title}
+                {cup.title}
               </h2>
               <p style={{ fontSize: "0.9rem", color: "var(--ink-soft)", marginBottom: "1rem" }}>
-                {tournament.subtitle}
+                {cup.subtitle}
               </p>
 
-              {champion && runnerUp ? (
+              {winner && finalist ? (
                 <div className="champion-banner" style={{ marginTop: 0, marginBottom: "1rem" }}>
                   <div className="champion-banner__item">
                     <HeroEmblem
-                      emblemKey={champion.emblemKey}
-                      accentHex={champion.accentHex}
-                      name={champion.name}
+                      emblemKey={winner.emblemKey}
+                      accentHex={winner.accentHex}
+                      name={winner.name}
                       size="sm"
                     />
                     <div>
-                      <div className="champion-banner__label">Триумфатор</div>
-                      <Link href={`/heroes/${champion.slug}`} className="champion-banner__name">
-                        {champion.name}
+                      <div className="champion-banner__label">{messages.archive.champion}</div>
+                      <Link href={`/heroes/${winner.slug}`} className="champion-banner__name">
+                        {winner.name}
                       </Link>
                     </div>
                   </div>
                   <div className="champion-banner__item">
                     <HeroEmblem
-                      emblemKey={runnerUp.emblemKey}
-                      accentHex={runnerUp.accentHex}
-                      name={runnerUp.name}
+                      emblemKey={finalist.emblemKey}
+                      accentHex={finalist.accentHex}
+                      name={finalist.name}
                       size="sm"
                     />
                     <div>
-                      <div className="champion-banner__label">Финалист</div>
-                      <Link href={`/heroes/${runnerUp.slug}`} className="champion-banner__name">
-                        {runnerUp.name}
+                      <div className="champion-banner__label">{messages.archive.finalist}</div>
+                      <Link href={`/heroes/${finalist.slug}`} className="champion-banner__name">
+                        {finalist.name}
                       </Link>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="active-cup-notice" style={{ marginTop: 0, marginBottom: "1rem" }}>
-                  Идёт групповой этап · Ежедневные анонсы открыты на главной странице
+                  {messages.archive.inProgress}
                 </div>
               )}
 
@@ -106,10 +112,10 @@ export default function AllTournamentsArchivePage() {
                 }}
               >
                 <span style={{ fontFamily: "var(--font-mono)", color: "var(--ink-muted)" }}>
-                  seed: {tournament.seed}
+                  seed: {cup.seed}
                 </span>
                 <Link href={href} className="btn-primary">
-                  Открыть таблицы и сетку →
+                  {messages.archive.open}
                 </Link>
               </div>
             </article>

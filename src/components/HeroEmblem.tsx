@@ -20,7 +20,7 @@ export function HeroEmblem({
     <div
       className={`hero-emblem hero-emblem--${size}`}
       style={{ "--hero-accent": accentHex } as React.CSSProperties}
-      title={`${name} · гербовый вензель`}
+      title={name}
       aria-label={name}
     >
       <svg
