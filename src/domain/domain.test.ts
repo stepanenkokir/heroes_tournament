@@ -242,7 +242,7 @@ describe("Таблицы групп, тай-брейки и сетка плей-
     expect(standings[1]?.heroId).toBe("h1");
     expect(standings[0]?.qualified).toBe(true);
     expect(standings[1]?.qualified).toBe(true);
-    expect(standings[0]?.tieBreakNote).toContain("личной встречи");
+    expect(standings[0]?.tieBreakNote).toBe("h2hPoints");
   });
 
   it("выводит 1-е и 2-е места групп в четвертьфиналы 1A-2B, 1B-2A, 1C-2D, 1D-2C", () => {

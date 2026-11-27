@@ -12,11 +12,8 @@ export type DisputeResolution = "main" | "sealed_extra" | "decisive" | "glory_lo
 
 export interface DomainMeta {
   id: DomainId;
-  title: string;
-  shortTitle: string;
   beats: DomainId;
   losesTo: DomainId;
-  ruleText: string;
 }
 
 export interface HeroSkill {

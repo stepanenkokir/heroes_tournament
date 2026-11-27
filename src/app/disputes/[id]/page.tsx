@@ -43,11 +43,30 @@ export default async function DisputeProtocolPage({
         ? messages.dispute.announced
         : messages.dispute.scheduled;
 
+  const resolutionReason =
+    dispute.resolution === "sealed_extra"
+      ? messages.common.resolutionSealed
+      : dispute.resolution === "decisive"
+        ? fill(messages.common.resolutionDecisive, {
+            a: dispute.decisiveScoreA,
+            b: dispute.decisiveScoreB
+          })
+        : dispute.resolution === "glory_lot"
+          ? messages.common.resolutionGlory
+          : messages.dispute.mainTitle;
+
+  const outcomeVerdict =
+    dispute.winnerSide === "A"
+      ? fill(messages.dispute.winner, { name: heroA?.name ?? "" })
+      : dispute.winnerSide === "B"
+        ? fill(messages.dispute.winner, { name: heroB?.name ?? "" })
+        : messages.dispute.draw;
+
   return (
     <div>
       <section className="page-hero">
         <div className="page-hero__top-bar">
-          <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+          <div className="protocol-hero__nav">
             <Link href={tournamentHref} className="btn-secondary">
               ← {tournament.title}
             </Link>
@@ -62,72 +81,50 @@ export default async function DisputeProtocolPage({
           <span className={`status-pill status-pill--${dispute.status}`}>{statusLabel}</span>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto 1fr",
-            gap: "1.5rem",
-            alignItems: "center",
-            marginTop: "1.2rem"
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+        <div className="protocol-matchup">
+          <div className="protocol-side">
             {heroA ? (
               <>
                 <HeroEmblem emblemKey={heroA.emblemKey} accentHex={heroA.accentHex} name={heroA.name} size="lg" />
                 <div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)", fontWeight: 700 }}>
+                  <div className="protocol-side__tag">
                     {fill(messages.dispute.sideA, { origin: heroA.origin })}
                   </div>
-                  <Link
-                    href={`/heroes/${heroA.slug}`}
-                    style={{ fontFamily: "var(--font-serif)", fontSize: "1.65rem", fontWeight: 700 }}
-                  >
+                  <Link href={`/heroes/${heroA.slug}`} className="protocol-side__name">
                     {heroA.name}
                   </Link>
-                  <div style={{ fontSize: "0.88rem", color: "var(--ink-soft)" }}>{heroA.epithet}</div>
+                  <div className="protocol-side__epithet">{heroA.epithet}</div>
                 </div>
               </>
             ) : (
               <div>
-                <div style={{ fontSize: "0.76rem", color: "var(--gold-seal)", fontWeight: 700 }}>
-                  {messages.dispute.waitingA}
-                </div>
-                <div style={{ fontFamily: "var(--font-serif)", fontSize: "1.3rem" }}>
+                <div className="protocol-side__waiting-tag">{messages.dispute.waitingA}</div>
+                <div className="protocol-side__waiting-source">
                   {localizeSourceLabel(dispute.sourceLabelA, locale, messages)}
                 </div>
               </div>
             )}
           </div>
 
-          <div className="dispute-card__score-box" style={{ minWidth: "150px", padding: "0.75rem 1.25rem" }}>
+          <div className="dispute-card__score-box protocol-score-box">
             {dispute.status === "completed" ? (
               <>
-                <div className="dispute-card__score tabular-nums" style={{ fontSize: "2rem" }}>
+                <div className="dispute-card__score protocol-score tabular-nums">
                   <span>{dispute.acclaimA}</span>
                   <span className="dispute-card__score-colon">:</span>
                   <span>{dispute.acclaimB}</span>
                 </div>
                 <div className="dispute-card__score-caption">{messages.dispute.acclaimSum}</div>
-                <div className="dispute-card__retention tabular-nums" style={{ fontSize: "0.82rem" }}>
+                <div className="dispute-card__retention protocol-retention tabular-nums">
                   {fill(messages.dispute.retention, {
-                  a: dispute.retentionA ?? 0,
-                  b: dispute.retentionB ?? 0
-                })}
+                    a: dispute.retentionA ?? 0,
+                    b: dispute.retentionB ?? 0
+                  })}
                 </div>
               </>
             ) : (
               <>
-                <div
-                  style={{
-                    fontFamily: "var(--font-serif)",
-                    fontSize: "1.2rem",
-                    fontWeight: 700,
-                    color: "var(--cinnabar)"
-                  }}
-                >
-                  — : —
-                </div>
+                <div className="protocol-score-pending">— : —</div>
                 <div className="dispute-card__score-caption">
                   {dispute.status === "announced" ? messages.dispute.resultTomorrow : messages.dispute.onSchedule}
                 </div>
@@ -135,37 +132,24 @@ export default async function DisputeProtocolPage({
             )}
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-end",
-              gap: "1rem",
-              textAlign: "right"
-            }}
-          >
+          <div className="protocol-side protocol-side--right">
             {heroB ? (
               <>
                 <div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)", fontWeight: 700 }}>
+                  <div className="protocol-side__tag">
                     {fill(messages.dispute.sideB, { origin: heroB.origin })}
                   </div>
-                  <Link
-                    href={`/heroes/${heroB.slug}`}
-                    style={{ fontFamily: "var(--font-serif)", fontSize: "1.65rem", fontWeight: 700 }}
-                  >
+                  <Link href={`/heroes/${heroB.slug}`} className="protocol-side__name">
                     {heroB.name}
                   </Link>
-                  <div style={{ fontSize: "0.88rem", color: "var(--ink-soft)" }}>{heroB.epithet}</div>
+                  <div className="protocol-side__epithet">{heroB.epithet}</div>
                 </div>
                 <HeroEmblem emblemKey={heroB.emblemKey} accentHex={heroB.accentHex} name={heroB.name} size="lg" />
               </>
             ) : (
               <div>
-                <div style={{ fontSize: "0.76rem", color: "var(--gold-seal)", fontWeight: 700 }}>
-                  {messages.dispute.waitingB}
-                </div>
-                <div style={{ fontFamily: "var(--font-serif)", fontSize: "1.3rem" }}>
+                <div className="protocol-side__waiting-tag">{messages.dispute.waitingB}</div>
+                <div className="protocol-side__waiting-source">
                   {localizeSourceLabel(dispute.sourceLabelB, locale, messages)}
                 </div>
               </div>
@@ -173,30 +157,13 @@ export default async function DisputeProtocolPage({
           </div>
         </div>
 
-        <div
-          style={{
-            marginTop: "1rem",
-            paddingTop: "0.75rem",
-            borderTop: "1px dashed var(--border-warm)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "0.75rem",
-            fontSize: "0.82rem",
-            color: "var(--ink-muted)"
-          }}
-        >
-          <span style={{ fontFamily: "var(--font-mono)" }}>
+        <div className="protocol-meta-bar">
+          <span className="protocol-seed">
             {fill(messages.common.protocolSeed, { seed: dispute.seed })}
           </span>
           <span>
             {dispute.status === "completed"
-              ? dispute.winnerSide === "A"
-                ? fill(messages.dispute.winner, { name: heroA?.name ?? "" })
-                : dispute.winnerSide === "B"
-                  ? fill(messages.dispute.winner, { name: heroB?.name ?? "" })
-                  : messages.dispute.draw
+              ? `${outcomeVerdict} · ${resolutionReason}`
               : messages.dispute.opensTomorrow}
           </span>
         </div>
@@ -224,7 +191,7 @@ export default async function DisputeProtocolPage({
                     {fill(messages.dispute.sideKit, { side, name: hero?.name ?? "" })}
                   </h3>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <div className="protocol-kit-list">
                   {list.map((pair, idx) => {
                     const hideSealedDetails =
                       pair.isSealed && dispute.status !== "completed" && !dispute.sealedUsed;
@@ -233,21 +200,12 @@ export default async function DisputeProtocolPage({
                     return (
                       <div
                         key={pair.slotIndex}
-                        style={{
-                          padding: "0.75rem",
-                          borderRadius: "8px",
-                          background: pair.isSealed ? "var(--gold-soft)" : "var(--parchment-bright)",
-                          border: "1px solid var(--border-warm)"
-                        }}
+                        className={`protocol-slot ${pair.isSealed ? "protocol-slot--sealed" : ""}`}
                       >
                         <div
-                          style={{
-                            fontSize: "0.75rem",
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            color: pair.isSealed ? "var(--gold-seal)" : "var(--ink-muted)",
-                            marginBottom: "0.45rem"
-                          }}
+                          className={`protocol-slot__title ${
+                            pair.isSealed ? "protocol-slot__title--sealed" : ""
+                          }`}
                         >
                           {pair.isSealed
                             ? dispute.sealedUsed
@@ -256,11 +214,11 @@ export default async function DisputeProtocolPage({
                             : fill(messages.dispute.openSlot, { side, n: idx + 1 })}
                         </div>
                         {hideSealedDetails ? (
-                          <div style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+                          <div className="protocol-slot__sealed-body">
                             {messages.dispute.sealedBody}
                           </div>
                         ) : (
-                          <div className="announced-pair" style={{ marginBottom: 0 }}>
+                          <div className="announced-pair announced-pair--flush">
                             <div className="announced-skill announced-skill--dominant">
                               <span className="announced-skill__tag">{messages.common.dominant}</span>
                               <strong>{dominant.title}</strong>
@@ -299,7 +257,7 @@ export default async function DisputeProtocolPage({
                 ? messages.dispute.openTomorrowTitle
                 : messages.dispute.waitingTitle}
             </h3>
-            <p style={{ color: "var(--ink-soft)" }}>
+            <p className="rule-card__lead">
               {dispute.status === "announced"
                 ? messages.dispute.openTomorrowBody
                 : fill(messages.dispute.waitingBody, {
@@ -312,6 +270,11 @@ export default async function DisputeProtocolPage({
 
       {dispute.status === "completed" ? (
         <>
+          <div className="protocol-outcome-bar">
+            <strong>{outcomeVerdict}</strong>
+            <span className="protocol-outcome-bar__reason">{resolutionReason}</span>
+          </div>
+
           <section className="section-block">
             <div className="section-header">
               <div>
@@ -543,65 +506,35 @@ export default async function DisputeProtocolPage({
                   ] as const
                 ).map(([side, hero, event]) => (
                   <div key={side} className="elo-proof-card tabular-nums">
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "0.75rem"
-                      }}
-                    >
-                      <Link
-                        href={`/heroes/${hero.slug}`}
-                        style={{ fontFamily: "var(--font-serif)", fontSize: "1.2rem", fontWeight: 700 }}
-                      >
+                    <div className="elo-proof-card__header">
+                      <Link href={`/heroes/${hero.slug}`} className="elo-proof-card__name">
                         {hero.name}
                       </Link>
                       <span
-                        className={
+                        className={`elo-proof-card__delta ${
                           event.delta > 0 ? "delta-positive" : event.delta < 0 ? "delta-negative" : "delta-neutral"
-                        }
-                        style={{ fontSize: "1.15rem" }}
+                        }`}
                       >
                         {fill(messages.dispute.eloDelta, {
                           delta: event.delta > 0 ? `+${event.delta}` : event.delta
                         })}
                       </span>
                     </div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(4, 1fr)",
-                        gap: "0.5rem",
-                        fontSize: "0.82rem",
-                        background: "var(--parchment-bright)",
-                        padding: "0.65rem",
-                        borderRadius: "8px",
-                        border: "1px solid var(--border-warm)"
-                      }}
-                    >
+                    <div className="elo-proof-stats">
                       <div>
-                        <div style={{ color: "var(--ink-muted)", fontSize: "0.72rem" }}>
-                          {messages.dispute.ratingBefore}
-                        </div>
+                        <div className="elo-proof-stats__label">{messages.dispute.ratingBefore}</div>
                         <strong>{event.ratingBefore}</strong>
                       </div>
                       <div>
-                        <div style={{ color: "var(--ink-muted)", fontSize: "0.72rem" }}>
-                          {messages.dispute.expected}
-                        </div>
+                        <div className="elo-proof-stats__label">{messages.dispute.expected}</div>
                         <strong>{event.expectedScore.toFixed(3)}</strong>
                       </div>
                       <div>
-                        <div style={{ color: "var(--ink-muted)", fontSize: "0.72rem" }}>
-                          {messages.dispute.outcome}
-                        </div>
+                        <div className="elo-proof-stats__label">{messages.dispute.outcome}</div>
                         <strong>{event.actualScore}</strong>
                       </div>
                       <div>
-                        <div style={{ color: "var(--ink-muted)", fontSize: "0.72rem" }}>
-                          {messages.dispute.ratingAfter}
-                        </div>
+                        <div className="elo-proof-stats__label">{messages.dispute.ratingAfter}</div>
                         <strong>{event.ratingAfter}</strong>
                       </div>
                     </div>

@@ -20,21 +20,6 @@ export function getGroupCodes(groupCount: number): GroupCode[] {
   return Array.from({ length: groupCount }, (_, i) => String.fromCharCode(65 + i));
 }
 
-export function getStageRussianLabel(stage: string, groupCode?: string | null): string {
-  switch (stage) {
-    case "group":
-      return groupCode ? `Группа ${groupCode}` : "Групповой этап";
-    case "qf":
-      return "Четвертьфинал";
-    case "sf":
-      return "Полуфинал";
-    case "final":
-      return "Финал Кубка";
-    default:
-      return stage;
-  }
-}
-
 /**
  * Жеребьёвка корзинами по текущему рейтингу (как на ЧМ):
  * по одному герою из каждой корзины в каждую группу.
@@ -133,6 +118,15 @@ export interface CompletedGroupMatchRecord {
   winnerSide: DisputeSide | null;
 }
 
+export type TieBreakKey =
+  | "h2hPoints"
+  | "h2hDiff"
+  | "acclaimDiff"
+  | "acclaimFor"
+  | "retention"
+  | "rating"
+  | "seed";
+
 export interface GroupStandingRow {
   rank: number;
   heroId: string;
@@ -148,7 +142,7 @@ export interface GroupStandingRow {
   entryRating: number;
   seedRank: number;
   qualified: boolean;
-  tieBreakNote: string | null;
+  tieBreakNote: TieBreakKey | null;
 }
 
 interface HeadToHeadStat {
@@ -314,19 +308,19 @@ export function computeGroupStandings(
       const hB = h2h.get(lower.heroId)!;
 
       if (hA.points !== hB.points) {
-        upper.tieBreakNote = "Выше по очкам личной встречи";
+        upper.tieBreakNote = "h2hPoints";
       } else if (hA.acclaimDiff !== hB.acclaimDiff) {
-        upper.tieBreakNote = "Выше по разнице признания в личных встречах";
+        upper.tieBreakNote = "h2hDiff";
       } else if (upper.acclaimDiff !== lower.acclaimDiff) {
-        upper.tieBreakNote = "Выше по общей разнице признания";
+        upper.tieBreakNote = "acclaimDiff";
       } else if (upper.acclaimFor !== lower.acclaimFor) {
-        upper.tieBreakNote = "Выше по сумме признания";
+        upper.tieBreakNote = "acclaimFor";
       } else if (upper.retentionFor !== lower.retentionFor) {
-        upper.tieBreakNote = "Выше по сумме удержания";
+        upper.tieBreakNote = "retention";
       } else if (upper.entryRating !== lower.entryRating) {
-        upper.tieBreakNote = "Выше по стартовому рейтингу";
+        upper.tieBreakNote = "rating";
       } else {
-        upper.tieBreakNote = "Выше по жребию посева";
+        upper.tieBreakNote = "seed";
       }
     }
 
@@ -347,7 +341,6 @@ export interface PlayoffBracketBlueprint {
   slotCode: PlayoffSlotCode;
   stage: "qf" | "sf" | "final";
   dayOffset: number; // 6..12 (дни 7..13 турнира)
-  title: string;
   sourceLabelA: string;
   sourceLabelB: string;
   dependsOnA: { type: "group"; groupCode: GroupCode; rank: 1 | 2 } | { type: "playoff"; slotCode: PlayoffSlotCode };
@@ -359,9 +352,8 @@ export const PLAYOFF_BLUEPRINT: readonly PlayoffBracketBlueprint[] = [
     slotCode: "QF1",
     stage: "qf",
     dayOffset: 6,
-    title: "Четвертьфинал 1",
-    sourceLabelA: "1-е место группы A",
-    sourceLabelB: "2-е место группы B",
+    sourceLabelA: "groupPlace:1:A",
+    sourceLabelB: "groupPlace:2:B",
     dependsOnA: { type: "group", groupCode: "A", rank: 1 },
     dependsOnB: { type: "group", groupCode: "B", rank: 2 }
   },
@@ -369,9 +361,8 @@ export const PLAYOFF_BLUEPRINT: readonly PlayoffBracketBlueprint[] = [
     slotCode: "QF2",
     stage: "qf",
     dayOffset: 7,
-    title: "Четвертьфинал 2",
-    sourceLabelA: "1-е место группы B",
-    sourceLabelB: "2-е место группы A",
+    sourceLabelA: "groupPlace:1:B",
+    sourceLabelB: "groupPlace:2:A",
     dependsOnA: { type: "group", groupCode: "B", rank: 1 },
     dependsOnB: { type: "group", groupCode: "A", rank: 2 }
   },
@@ -379,9 +370,8 @@ export const PLAYOFF_BLUEPRINT: readonly PlayoffBracketBlueprint[] = [
     slotCode: "QF3",
     stage: "qf",
     dayOffset: 8,
-    title: "Четвертьфинал 3",
-    sourceLabelA: "1-е место группы C",
-    sourceLabelB: "2-е место группы D",
+    sourceLabelA: "groupPlace:1:C",
+    sourceLabelB: "groupPlace:2:D",
     dependsOnA: { type: "group", groupCode: "C", rank: 1 },
     dependsOnB: { type: "group", groupCode: "D", rank: 2 }
   },
@@ -389,9 +379,8 @@ export const PLAYOFF_BLUEPRINT: readonly PlayoffBracketBlueprint[] = [
     slotCode: "QF4",
     stage: "qf",
     dayOffset: 9,
-    title: "Четвертьфинал 4",
-    sourceLabelA: "1-е место группы D",
-    sourceLabelB: "2-е место группы C",
+    sourceLabelA: "groupPlace:1:D",
+    sourceLabelB: "groupPlace:2:C",
     dependsOnA: { type: "group", groupCode: "D", rank: 1 },
     dependsOnB: { type: "group", groupCode: "C", rank: 2 }
   },
@@ -399,9 +388,8 @@ export const PLAYOFF_BLUEPRINT: readonly PlayoffBracketBlueprint[] = [
     slotCode: "SF1",
     stage: "sf",
     dayOffset: 10,
-    title: "Полуфинал 1",
-    sourceLabelA: "Победитель пары 1A–2B",
-    sourceLabelB: "Победитель пары 1C–2D",
+    sourceLabelA: "pairWinner:1A–2B",
+    sourceLabelB: "pairWinner:1C–2D",
     dependsOnA: { type: "playoff", slotCode: "QF1" },
     dependsOnB: { type: "playoff", slotCode: "QF3" }
   },
@@ -409,9 +397,8 @@ export const PLAYOFF_BLUEPRINT: readonly PlayoffBracketBlueprint[] = [
     slotCode: "SF2",
     stage: "sf",
     dayOffset: 11,
-    title: "Полуфинал 2",
-    sourceLabelA: "Победитель пары 1B–2A",
-    sourceLabelB: "Победитель пары 1D–2C",
+    sourceLabelA: "pairWinner:1B–2A",
+    sourceLabelB: "pairWinner:1D–2C",
     dependsOnA: { type: "playoff", slotCode: "QF2" },
     dependsOnB: { type: "playoff", slotCode: "QF4" }
   },
@@ -419,9 +406,8 @@ export const PLAYOFF_BLUEPRINT: readonly PlayoffBracketBlueprint[] = [
     slotCode: "FINAL",
     stage: "final",
     dayOffset: 12,
-    title: "Финал Кубка",
-    sourceLabelA: "Победитель полуфинала 1",
-    sourceLabelB: "Победитель полуфинала 2",
+    sourceLabelA: "semiWinner:1",
+    sourceLabelB: "semiWinner:2",
     dependsOnA: { type: "playoff", slotCode: "SF1" },
     dependsOnB: { type: "playoff", slotCode: "SF2" }
   }

@@ -110,18 +110,19 @@ describe("локали En, Es, Ru", () => {
   it("переводит подписи стадий, источники пар и тай-брейки", () => {
     expect(stageLabel("group", "C", DICTIONARIES.en)).toBe("Group C");
     expect(stageLabel("final", null, DICTIONARIES.es)).toBe("Final de la Copa");
-    expect(localizeSourceLabel("1-е место группы A", "en", DICTIONARIES.en)).toBe("1st in group A");
-    expect(localizeSourceLabel("2-е место группы B", "es", DICTIONARIES.es)).toBe("2.º del grupo B");
-    expect(localizeSourceLabel("Победитель пары 1A–2B", "en", DICTIONARIES.en)).toBe(
+    expect(localizeSourceLabel("groupPlace:1:A", "en", DICTIONARIES.en)).toBe("1st in group A");
+    expect(localizeSourceLabel("groupPlace:2:B", "es", DICTIONARIES.es)).toBe("2.º del grupo B");
+    expect(localizeSourceLabel("pairWinner:1A–2B", "en", DICTIONARIES.en)).toBe(
       "Winner of pairing 1A–2B"
     );
-    expect(localizeSourceLabel("Победитель полуфинала 2", "ru", DICTIONARIES.ru)).toBe(
+    expect(localizeSourceLabel("semiWinner:2", "ru", DICTIONARIES.ru)).toBe(
       "Победитель полуфинала 2"
     );
-    expect(localizeTieBreak("Выше по очкам личной встречи", DICTIONARIES.en)).toBe(
+    expect(localizeSourceLabel("group:A", "en", DICTIONARIES.en)).toBe("Group A");
+    expect(localizeTieBreak("h2hPoints", DICTIONARIES.en)).toBe(
       "Ahead on head-to-head points"
     );
-    expect(localizeTieBreak("Выше по жребию посева", DICTIONARIES.ru)).toContain("жребию");
+    expect(localizeTieBreak("seed", DICTIONARIES.ru)).toContain("жребию");
     expect(localizeTieBreak(null, DICTIONARIES.en)).toBeNull();
   });
 
