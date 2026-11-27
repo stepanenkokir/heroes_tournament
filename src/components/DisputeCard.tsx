@@ -163,6 +163,16 @@ export function DisputeCard({
 
       {resolutionNote ? <div className="dispute-card__resolution-note">{resolutionNote}</div> : null}
 
+      {card.voteSnapshots.some((s) => s.appliedBonus > 0) ? (
+        <div className="dispute-card__resolution-note">
+          {messages.voting.crowdShifted}:{" "}
+          {card.voteSnapshots
+            .filter((s) => s.appliedBonus > 0)
+            .map((s) => `${localizeSkill(s.skill, locale).title} +${s.appliedBonus}`)
+            .join(", ")}
+        </div>
+      ) : null}
+
       {expandedAnnouncement && (openA.length > 0 || openB.length > 0) ? (
         <div className="dispute-card__announced-grid">
           {(

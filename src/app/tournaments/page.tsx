@@ -35,16 +35,24 @@ export default async function AllTournamentsArchivePage() {
           const winner = champion ? localizeHero(champion, locale) : null;
           const finalist = runnerUp ? localizeHero(runnerUp, locale) : null;
           const href = cup.status === "active" ? "/tournament" : `/tournaments/${cup.slug}`;
+          const themeKey =
+            tournament.fieldKind === "theme" && tournament.themeId
+              ? (tournament.themeId as keyof typeof messages.themes)
+              : "open";
+          const themeLabel = messages.themes[themeKey] ?? messages.themes.open;
           return (
             <article key={cup.id} className="group-card">
               <div className="group-card__header">
-                <span
-                  className={`status-pill ${
-                    cup.status === "active" ? "status-pill--announced" : "status-pill--completed"
-                  }`}
-                >
-                  {cup.status === "active" ? messages.status.currentDraw : messages.status.archivedCup}
-                </span>
+                <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
+                  <span
+                    className={`status-pill ${
+                      cup.status === "active" ? "status-pill--announced" : "status-pill--completed"
+                    }`}
+                  >
+                    {cup.status === "active" ? messages.status.currentDraw : messages.status.archivedCup}
+                  </span>
+                  <span className="status-pill status-pill--scheduled">{themeLabel}</span>
+                </div>
                 <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>
                   {formatLocaleDate(cup.startDate, locale, "long")} —{" "}
                   {formatLocaleDate(cup.endDate, locale, "long")}

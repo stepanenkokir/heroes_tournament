@@ -46,6 +46,11 @@ export default async function RootLayout({
       label: messages.nav.ratings,
       current: pathname === "/ratings" || pathname.startsWith("/heroes/")
     },
+    {
+      href: "/cabinet",
+      label: messages.nav.cabinet,
+      current: pathname === "/cabinet"
+    },
     { href: "/rules", label: messages.nav.rules, current: pathname === "/rules" }
   ];
 

@@ -1,7 +1,10 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { USER_COOKIE } from "@/auth-cookie";
 import { DomainBadge } from "@/components/DomainBadge";
 import { HeroEmblem } from "@/components/HeroEmblem";
+import { VotePanel } from "@/components/VotePanel";
 import { formatLocaleDate } from "@/db/dates";
 import { getDisputeProtocolView } from "@/db/queries";
 import { getMessages } from "@/i18n/dictionaries";
@@ -20,12 +23,15 @@ export default async function DisputeProtocolPage({
   const messages = getMessages(locale);
   const { id } = await params;
   const data = getDisputeProtocolView(decodeURIComponent(id));
+  const isSignedIn = Boolean((await cookies()).get(USER_COOKIE)?.value);
 
   if (!data) {
     notFound();
   }
 
-  const { exchanges, eloA, eloB } = data;
+  const { exchanges, eloA, eloB, commentaries } = data;
+  const localeCommentary =
+    commentaries.find((c) => c.locale === locale) ?? commentaries[0] ?? null;
   const dispute = data.card.dispute;
   const tournament = localizeTournament(data.card.tournament, locale);
   const heroA = data.card.heroA ? localizeHero(data.card.heroA, locale) : null;
@@ -166,8 +172,42 @@ export default async function DisputeProtocolPage({
               ? `${outcomeVerdict} · ${resolutionReason}`
               : messages.dispute.opensTomorrow}
           </span>
+          {heroA && heroB ? (
+            <a
+              href={`/api/channels/daily-card?disputeId=${encodeURIComponent(dispute.id)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="dispute-card__link"
+            >
+              {messages.channels.downloadSvgCard}
+            </a>
+          ) : null}
         </div>
       </section>
+
+      {heroA && heroB ? <VotePanel card={data.card} isSignedIn={isSignedIn} /> : null}
+
+      {dispute.status === "completed" && localeCommentary ? (
+        <section className="section-block">
+          <div className="rule-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginBottom: "0.45rem" }}>
+              <h3 style={{ margin: 0 }}>{localeCommentary.headline}</h3>
+              <span className="status-pill status-pill--completed">
+                {messages.channels.commentaryTitle}
+              </span>
+            </div>
+            <p style={{ color: "var(--ink-soft)", marginBottom: "0.5rem" }}>
+              {localeCommentary.summary}
+            </p>
+            <p style={{ color: "var(--ink-muted)", fontSize: "0.86rem", marginBottom: "0.45rem" }}>
+              {localeCommentary.keyTurn}
+            </p>
+            <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)" }}>
+              {messages.channels.commentaryBadge}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {data.card.announcedA.length > 0 && data.card.announcedB.length > 0 ? (
         <section className="section-block">

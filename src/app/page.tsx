@@ -17,6 +17,7 @@ export default async function HomePage() {
     todayIso,
     activeTournament,
     todayDisputes,
+    upcomingVotingDisputes,
     recentDisputes,
     completedTournaments,
     topHeroes
@@ -73,6 +74,44 @@ export default async function HomePage() {
           {todayDisputes.map((card) => (
             <DisputeCard key={card.dispute.id} card={card} expandedAnnouncement />
           ))}
+        </div>
+      </section>
+
+      {upcomingVotingDisputes.length > 0 ? (
+        <section className="section-block">
+          <div className="section-header">
+            <div>
+              <h2 className="section-title">{messages.voting.sectionTitle}</h2>
+              <p className="section-subtitle">{messages.voting.sectionSubtitle}</p>
+            </div>
+            <Link href="/cabinet" className="btn-secondary">
+              {messages.nav.cabinet}
+            </Link>
+          </div>
+          <div className="cards-grid-2">
+            {upcomingVotingDisputes.map((card) => (
+              <DisputeCard key={card.dispute.id} card={card} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="section-block">
+        <div className="group-card">
+          <div className="group-card__header">
+            <h3 className="group-card__title">{messages.channels.dailyCardTitle}</h3>
+            <a
+              href="/api/channels/daily-card"
+              target="_blank"
+              rel="noreferrer"
+              className="btn-secondary"
+            >
+              {messages.channels.downloadSvgCard}
+            </a>
+          </div>
+          <p style={{ color: "var(--ink-soft)", fontSize: "0.88rem", margin: 0 }}>
+            {messages.channels.dailyCardLead}
+          </p>
         </div>
       </section>
 
