@@ -35,8 +35,28 @@ npm start
 | --- | --- |
 | `npm run dev` | Next.js dev server |
 | `npm run seed` | Wipe and refill `data/heroes-tournament.db` as of today (Moscow) |
+| `npm run advance` | Close past disputes and announce today's disputes in `data/heroes-tournament.db` (Moscow date) |
 | `npm test` | Vitest (`src/**/*.test.ts`) |
 | `npm run build` / `npm start` | Production build and server |
+
+## Daily schedule (12:00 Europe/Moscow)
+
+Page requests only read `data/heroes-tournament.db` and never advance the tournament timeline on their own. Run `npm run seed` once to create the initial database, then schedule `npm run advance` to run daily at 12:00 `Europe/Moscow`. Running `npm run advance` multiple times on the same date is a no-op; if a day was missed, one run catches up all elapsed days.
+
+**Linux (cron):**
+
+```cron
+CRON_TZ=Europe/Moscow
+0 12 * * * cd /path/to/HeroesTournament && npm run advance
+```
+
+**Windows (Task Scheduler):**
+
+Create a daily task triggered at `12:00` in the `Russian Standard Time` (`Europe/Moscow`) time zone that runs `npm run advance` in the project directory:
+
+```powershell
+schtasks /Create /SC DAILY /TN "HeroesTournamentAdvance" /TR "cmd /c cd /d C:\Projects\games\HeroesTournament && npm run advance" /ST 12:00 /F
+```
 
 ## Pages
 
@@ -107,7 +127,7 @@ src/theme.ts    light and dark theme
 data/           heroes-tournament.db (created by seed, not committed)
 ```
 
-Domain code does not import the database. Seeding (`src/db/engine.ts`) is the only place that walks editions, writes rows, and advances Elo. Pages read through `src/db/queries.ts`.
+Domain code does not import the database. `src/db/engine.ts` (`seed` and `advance`) is the only place that walks editions, writes rows, and advances Elo. Pages only read through `src/db/queries.ts`.
 
 Hero names in the database stay in their canonical form. Translated epithets, origins, and skill text are applied at render time from `src/i18n`.
 
