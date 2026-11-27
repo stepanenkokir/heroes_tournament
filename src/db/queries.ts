@@ -10,9 +10,7 @@ import {
   type GroupAssignment,
   type GroupStandingRow
 } from "../domain/index";
-import { getGlobalDbBundle } from "./client";
-import { getMoscowTodayIso } from "./dates";
-import { ensureDatabaseReady } from "./engine";
+import { getGlobalDbBundle, type AppDbBundle } from "./client";
 import {
   disputeAnnouncementsTable,
   disputeExchangesTable,
@@ -75,10 +73,8 @@ export interface TournamentFullView {
   }>;
 }
 
-function getReadyDb() {
-  const bundle = getGlobalDbBundle();
-  ensureDatabaseReady(bundle);
-  return bundle;
+function getReadyDb(): AppDbBundle {
+  return getGlobalDbBundle();
 }
 
 function buildMaps(bundle = getReadyDb()) {
@@ -129,28 +125,34 @@ function hydrateDisputeCard(
   };
 }
 
-export function getHomePortalData() {
-  const { db, tournaments, heroMap, skillMap, tournamentMap } = buildMaps();
-  const todayIso = getMoscowTodayIso();
+export function getHomePortalData(bundle = getReadyDb()) {
+  const { db, tournaments, heroMap, skillMap, tournamentMap } = buildMaps(bundle);
 
   const activeTournament =
-    tournaments.find((t) => t.status === "active") ?? tournaments[tournaments.length - 1]!;
+    tournaments.find((t) => t.status === "active") ?? tournaments[tournaments.length - 1] ?? null;
   const completedTournaments = tournaments
     .filter((t) => t.status === "completed")
     .sort((a, b) => b.editionNumber - a.editionNumber);
 
-  const allActiveDisputes = db
-    .select()
-    .from(disputesTable)
-    .where(eq(disputesTable.tournamentId, activeTournament.id))
-    .orderBy(asc(disputesTable.matchOrder))
-    .all();
+  const allActiveDisputes = activeTournament
+    ? db
+        .select()
+        .from(disputesTable)
+        .where(eq(disputesTable.tournamentId, activeTournament.id))
+        .orderBy(asc(disputesTable.matchOrder))
+        .all()
+    : [];
 
   const announcementRows = db.select().from(disputeAnnouncementsTable).all();
 
-  const todayDisputes = allActiveDisputes
-    .filter((d) => d.scheduledDate === todayIso)
-    .map((d) => hydrateDisputeCard(d, announcementRows, heroMap, skillMap, tournamentMap));
+  const todayIso =
+    allActiveDisputes.find((d) => d.status === "announced")?.scheduledDate ?? null;
+
+  const todayDisputes = todayIso
+    ? allActiveDisputes
+        .filter((d) => d.status === "announced" && d.scheduledDate === todayIso)
+        .map((d) => hydrateDisputeCard(d, announcementRows, heroMap, skillMap, tournamentMap))
+    : [];
 
   const recentDisputes = allActiveDisputes
     .filter((d) => d.status === "completed")
@@ -176,8 +178,8 @@ export function getHomePortalData() {
   };
 }
 
-export function getAllTournamentsSummary() {
-  const { tournaments, heroMap } = buildMaps();
+export function getAllTournamentsSummary(bundle = getReadyDb()) {
+  const { tournaments, heroMap } = buildMaps(bundle);
   return tournaments.map((t) => ({
     tournament: t,
     champion: t.championHeroId ? (heroMap.get(t.championHeroId) ?? null) : null,
@@ -185,9 +187,11 @@ export function getAllTournamentsSummary() {
   }));
 }
 
-export function getTournamentFullView(slugOrActive: string | "active"): TournamentFullView | null {
-  const { db, tournaments, heroMap, skillMap, tournamentMap } = buildMaps();
-  const todayIso = getMoscowTodayIso();
+export function getTournamentFullView(
+  slugOrActive: string | "active",
+  bundle = getReadyDb()
+): TournamentFullView | null {
+  const { db, tournaments, heroMap, skillMap, tournamentMap } = buildMaps(bundle);
 
   const tournament =
     slugOrActive === "active"
@@ -210,6 +214,9 @@ export function getTournamentFullView(slugOrActive: string | "active"): Tourname
     .where(eq(disputesTable.tournamentId, tournament.id))
     .orderBy(asc(disputesTable.matchOrder))
     .all();
+
+  const announcedDateIso =
+    disputeRows.find((d) => d.status === "announced")?.scheduledDate ?? null;
 
   const announcementRows = db.select().from(disputeAnnouncementsTable).all();
   const cards = disputeRows.map((d) =>
@@ -273,7 +280,7 @@ export function getTournamentFullView(slugOrActive: string | "active"): Tourname
       dayOffset,
       dayNumber: dayOffset + 1,
       scheduledDate,
-      isToday: scheduledDate === todayIso,
+      isToday: announcedDateIso !== null && scheduledDate === announcedDateIso,
       disputes: dayCards
     };
   });

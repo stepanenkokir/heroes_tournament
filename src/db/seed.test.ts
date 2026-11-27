@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createDbBundle } from "./client.js";
 import { addDaysIso } from "./dates.js";
 import { seedFullPortalDatabase, syncPortalTimeline } from "./engine.js";
+import { getHomePortalData, getTournamentFullView } from "./queries.js";
 import {
   disputeExchangesTable,
   disputesTable,
@@ -74,7 +75,10 @@ describe("Сидирование 3 архивных кубков, текущег
     expect(announced.every((d) => d.acclaimA === null && d.acclaimB === null)).toBe(true);
 
     // При наступлении следующего дня сегодняшние 4 анонса закрываются, а следующие 4 открываются
-    syncPortalTimeline(bundle1, addDaysIso(fixedToday, 1));
+    const nextDayIso = addDaysIso(fixedToday, 1);
+    const stepSummary = syncPortalTimeline(bundle1, nextDayIso);
+    expect(stepSummary).toEqual({ completedNow: 4, announcedNow: 4 });
+
     const afterNextDay = bundle1.db
       .select()
       .from(disputesTable)
@@ -92,5 +96,43 @@ describe("Сидирование 3 архивных кубков, текущег
       .filter((d) => d.status === "completed").length;
     const totalRatingEvents = bundle1.db.select().from(ratingEventsTable).all().length;
     expect(totalRatingEvents).toBe(totalCompletedDisputes * 2);
+
+    // Повторный запуск на ту же дату не меняет рейтинги и не дублирует события Эло
+    const heroesBeforeRepeat = bundle1.db
+      .select()
+      .from(heroesTable)
+      .orderBy(asc(heroesTable.id))
+      .all();
+    const repeatSummary = syncPortalTimeline(bundle1, nextDayIso);
+    expect(repeatSummary).toEqual({ completedNow: 0, announcedNow: 0 });
+    expect(bundle1.db.select().from(ratingEventsTable).all()).toHaveLength(totalRatingEvents);
+    expect(
+      bundle1.db.select().from(heroesTable).orderBy(asc(heroesTable.id)).all()
+    ).toEqual(heroesBeforeRepeat);
+  });
+
+  it("читает текущий день из announced-диспутов и не сидирует пустую базу на чтении", () => {
+    const emptyBundle = createDbBundle(":memory:");
+    const emptyHome = getHomePortalData(emptyBundle);
+    expect(emptyHome.todayIso).toBeNull();
+    expect(emptyHome.todayDisputes).toHaveLength(0);
+    expect(emptyBundle.db.select().from(heroesTable).all()).toHaveLength(0);
+
+    const fixedSeedDay = "2020-05-10";
+    const seededBundle = createDbBundle(":memory:");
+    seedFullPortalDatabase(seededBundle, fixedSeedDay);
+
+    const home = getHomePortalData(seededBundle);
+    expect(home.todayIso).toBe(fixedSeedDay);
+    expect(home.todayDisputes).toHaveLength(4);
+    expect(home.todayDisputes.every((c) => c.dispute.scheduledDate === fixedSeedDay)).toBe(true);
+
+    const activeView = getTournamentFullView("active", seededBundle);
+    expect(activeView?.days.filter((d) => d.isToday).map((d) => d.scheduledDate)).toEqual([
+      fixedSeedDay
+    ]);
+
+    const archiveView = getTournamentFullView("cup-1", seededBundle);
+    expect(archiveView?.days.every((d) => !d.isToday)).toBe(true);
   });
 });

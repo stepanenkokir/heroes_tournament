@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "seed": "tsx src/db/seed.ts",
+    "advance": "tsx src/db/advance.ts",
     "test": "vitest run"
   },
   "dependencies": {

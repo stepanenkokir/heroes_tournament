@@ -602,6 +602,11 @@ function completeDispute(
   }
 }
 
+export interface TimelineSyncSummary {
+  completedNow: number;
+  announcedNow: number;
+}
+
 /**
  * В одной транзакции:
  * 1) Все диспуты с датой раньше asOfDateIso досчитываются и закрываются (completed).
@@ -610,8 +615,10 @@ function completeDispute(
 export function syncPortalTimeline(
   bundle: AppDbBundle,
   asOfDateIso: string = getMoscowTodayIso()
-): void {
+): TimelineSyncSummary {
   const { sqlite, db } = bundle;
+  let completedNow = 0;
+  let announcedNow = 0;
 
   const tx = sqlite.transaction(() => {
     const existingEvents = db
@@ -647,8 +654,11 @@ export function syncPortalTimeline(
         for (const dispute of dayDisputes) {
           if (dispute.scheduledDate < asOfDateIso && dispute.status !== "completed") {
             completeDispute(bundle, dispute, nextSequence);
+            completedNow += 1;
           } else if (dispute.scheduledDate === asOfDateIso && dispute.status === "scheduled") {
-            ensureDisputeAnnounced(bundle, dispute);
+            if (ensureDisputeAnnounced(bundle, dispute)) {
+              announcedNow += 1;
+            }
           }
         }
       }
@@ -659,6 +669,7 @@ export function syncPortalTimeline(
   });
 
   tx();
+  return { completedNow, announcedNow };
 }
 
 export function buildDefaultTournamentSpecs(todayIso: string): TournamentEditionSpec[] {
@@ -747,18 +758,5 @@ export function seedFullPortalDatabase(
 
   if (!verification.valid) {
     throw new Error(`Rating ledger verification failed:\n${verification.mismatches.join("\n")}`);
-  }
-}
-
-export function ensureDatabaseReady(bundle: AppDbBundle): void {
-  const countRow = bundle.sqlite
-    .prepare("SELECT COUNT(*) as cnt FROM heroes")
-    .get() as { cnt: number };
-
-  const todayIso = getMoscowTodayIso();
-  if (countRow.cnt === 0) {
-    seedFullPortalDatabase(bundle, todayIso);
-  } else {
-    syncPortalTimeline(bundle, todayIso);
   }
 }

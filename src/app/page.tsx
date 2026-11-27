@@ -21,19 +21,23 @@ export default async function HomePage() {
     completedTournaments,
     topHeroes
   } = getHomePortalData();
-  const cup = localizeTournament(activeTournament, locale);
+  const cup = activeTournament ? localizeTournament(activeTournament, locale) : null;
 
   return (
     <div>
       <section className="page-hero">
         <div className="page-hero__top-bar">
-          <span className="page-hero__kicker">
-            {fill(messages.home.kicker, { date: formatLocaleDate(todayIso, locale, "long") })}
-          </span>
-          <span className="page-hero__dates">
-            {cup.title} ({formatLocaleDate(cup.startDate, locale, "long")} —{" "}
-            {formatLocaleDate(cup.endDate, locale, "long")})
-          </span>
+          {todayIso ? (
+            <span className="page-hero__kicker">
+              {fill(messages.home.kicker, { date: formatLocaleDate(todayIso, locale, "long") })}
+            </span>
+          ) : null}
+          {cup ? (
+            <span className="page-hero__dates">
+              {cup.title} ({formatLocaleDate(cup.startDate, locale, "long")} —{" "}
+              {formatLocaleDate(cup.endDate, locale, "long")})
+            </span>
+          ) : null}
         </div>
 
         <h1 className="page-hero__title">{messages.home.title}</h1>
