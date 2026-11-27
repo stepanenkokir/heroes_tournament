@@ -17,10 +17,11 @@ export const en: Messages = {
     current: "Current cup",
     archive: "Cup archive",
     ratings: "Rating and proofs",
-    rules: "Rules and formula"
+    rules: "Rules and formula",
+    cabinet: "Cabinet & votes"
   },
   footer: {
-    line: "Spectator portal of intellectual contests (16 heroes, 6 domains, a clean exchange formula).",
+    line: "Spectator portal of intellectual contests (50-hero pool, 16 per cup, 6 domains, a clean exchange formula).",
     timezone: "Schedule and day-close timezone: Europe/Moscow"
   },
   locale: { label: "Interface language" },
@@ -29,10 +30,10 @@ export const en: Messages = {
     kicker: "Today's card · {date} · Europe/Moscow",
     title: "Today's disputes: skills are open, the result arrives tomorrow",
     subtitle:
-      "Each morning the portal seals yesterday's protocols and announces two dominants and two appeals for today's meetings. A third pair stays under wax seal in case of a playoff tie.",
+      "Each morning the portal seals yesterday's protocols and announces two dominants and two appeals for today's meetings. Before noon spectators can vote to support a skill stat on upcoming pairings.",
     openCup: "Open the cup table and schedule →",
-    openRatings: "Elo ratings and proofs for all 16 heroes",
-    openRules: "Acclaim formula and the domain ring",
+    openRatings: "Elo ratings and proofs for all 50 heroes",
+    openRules: "Acclaim formula, themes, and legal code",
     billboardTitle: "Today's card · disputes: {count}",
     billboardSubtitle:
       "Two open attacking skills (dominants) and two answering skills (appeals) are already known. The score appears at 00:00 Moscow time.",
@@ -44,7 +45,7 @@ export const en: Messages = {
     fullTable: "Full table and proof ledger →",
     overall: "OVERALL STANDING",
     archiveTitle: "Archive of completed cups",
-    archiveSubtitle: "Three fully played tournaments (31 disputes each), with group tables and a knockout bracket.",
+    archiveSubtitle: "Ten fully played tournaments (open and themed, 31 disputes each), with group tables and a knockout bracket.",
     allTournaments: "All tournaments →",
     completed: "Completed · {edition}",
     champion: "Cup holder",
@@ -229,20 +230,20 @@ export const en: Messages = {
   },
   rules: {
     kicker: "Code and mathematics of the tournament",
-    edition: "Rules edition · 16 heroes · 6 domains",
-    title: "Rules of the intellectual dispute and the scoring formulas",
+    edition: "Rules edition · 50-hero pool · 16 per cup · 6 domains",
+    title: "Rules of the intellectual dispute, crowd voting, and source code",
     lead: "Heroes Tournament has no physical damage and no brawl. The contest is a public dispute: participants press with dominants and hold their ground with appeals.",
-    s1Title: "1. A hero's skills: 5 dominants and 5 appeals",
-    s1Lead: "Each of the 16 heroes has exactly 10 authored skills:",
+    s1Title: "1. The 50-hero pool, themes, and skills",
+    s1Lead: "The roster holds 50 public-domain heroes; each cup draws 16 entrants by deterministic seed (Open draw or a theme: Myth & Bylina, Road & Sea, Tricksters, Direct Argument). Each hero has 10 authored skills:",
     s1Dom: "5 dominants — theses the hero presses with. Stats: Sharpness (30–90) and Depth (30–90).",
     s1App: "5 appeals — replies the hero calls on to defend a position. Stats: Firmness (30–90) and Resourcefulness (30–90).",
     s1Day: "On the day of a dispute, 2 dominants and 2 appeals of each hero are opened. The third pair is drawn at once and stays sealed. It is opened only if acclaim is level in the playoff.",
     s2Title: "2. The ring of six domains",
     s2Lead:
       "Domains form a ring: each beats the next in the chain (multiplier ×1.2) and yields to the previous (multiplier ×0.8). Every other pairing is ×1.0.",
-    s3Title: "3. The formula of one exchange",
+    s3Title: "3. The exchange formula and crowd vote snapshot",
     s3Lead:
-      "The main series is four exchanges: A1→B1, B1→A1, A2→B2, B2→A2. Both heroes play exactly two dominants, so there is no first-move advantage.",
+      "The main series is four exchanges: A1→B1, B1→A1, A2→B2, B2→A2. Before the day is announced, spectators may cast one ballot per match (match budget 6 points, prior weight 24, cap +3 to a single stat within 30–90). The base roster never mutates.",
     formula:
       "press = sharpness * (0.7 + 0.3 * depth / 100) * affinity\nhold  = firmness * (0.7 + 0.3 * resourcefulness / 100)\nacclaim = max(0, round(press * j - hold))\nretention = round(min(press * j, hold))",
     s3Note:
@@ -261,7 +262,96 @@ export const en: Messages = {
       "Every hero begins the history at 1500 points, before the first cup. Rating is not an input to the exchange formula (a favorite can lose to an unlucky domain draw), but it sets the pots for the next tournament's draw.",
     eloFormula: "E_A = 1 / (1 + 10 ^ ((R_B - R_A) / 400))\ndelta = round(K * (S - E))",
     s5Note:
-      "S is 1 (win), 0.5 (group draw), or 0 (loss). Stage importance: K = 20 in the group, K = 28 in the quarterfinals and semifinals, K = 36 in the cup final. Each delta is rounded to an integer on its own, so at some odd thresholds the two deltas may sum to ±1 rather than zero. Every event is written to the open ledger and can be replayed from scratch."
+      "S is 1 (win), 0.5 (group draw), or 0 (loss). Stage importance: K = 20 in the group, K = 28 in the quarterfinals and semifinals, K = 36 in the cup final. Each delta is rounded to an integer on its own, so at some odd thresholds the two deltas may sum to ±1 rather than zero. Every event is written to the open ledger and can be replayed from scratch.",
+    s6Title: "6. Public domain sources, user proposals, and no-betting policy",
+    s6Lead:
+      "All 50 heroes derive strictly from myth, folklore, and classic public-domain literature (Homer, the Eddas, Slavic bylinas, the Thousand and One Nights, Shakespeare, Cervantes, Dumas, Goethe, Beaumarchais, Swift, Poe, Austen, Verne, Carroll, Luo Guanzhong, Wu Cheng'en). Studio film or comic-book likenesses are never used—only original SVG monograms and authored skill copy.",
+    s6PublicDomain:
+      "The analytical protocol recap is generated strictly from exchange numbers and domains without quoting copyrighted translations.",
+    s6Submissions:
+      "User proposals for a new hero or skill unlock at the reputation threshold (1 proposal per season), pass through mandatory moderation, and require both a public-domain attestation and a non-exclusive license to the project.",
+    s6NoBetting:
+      "The portal does not accept real-money wagers on outcomes and pays no cash prizes. Crowd support operates strictly inside a bounded match budget (BUDGET = 6, PRIOR = 24, cap +3 per stat) and never multiplies reputation points."
+  },
+  themes: {
+    open: "Open draw (all 50 heroes)",
+    myth_bylina: "Theme: Myth & Bylina",
+    road_sea: "Theme: Road & Sea",
+    tricksters: "Theme: Tricksters & Riddles",
+    direct_argument: "Theme: Direct Argument"
+  },
+  voting: {
+    sectionTitle: "Spectator voting before the day opens",
+    sectionSubtitle:
+      "While a pairing is known and the dispute status is “Scheduled”, each spectator may direct one ballot toward a chosen skill stat. At 12:00 (Europe/Moscow) the window closes and the snapshot is frozen.",
+    openWindowBadge: "Voting window open",
+    frozenBadge: "Snapshot frozen",
+    budgetFormula: "Crowd formula: share = W / (W_match + 24) · raw = 6 × share · cap +3 (30..90)",
+    chooseSide: "1. Dispute side",
+    chooseSkill: "2. Hero skill",
+    chooseStat: "3. Stat to boost",
+    statPrimary: "Primary (Sharpness / Firmness)",
+    statSecondary: "Secondary (Depth / Resourcefulness)",
+    submitVote: "Record ballot in snapshot",
+    savedNotice: "Ballot recorded. You may change it until skills are announced.",
+    signInPrompt: "Sign in via the Cabinet (Telegram / Google / VK ID) to cast ballots and earn reputation.",
+    noShiftsYet: "No spectator stat shifts were cast for this dispute (base roster stats).",
+    crowdShifted: "The crowd shifted these stats before the dispute opened:",
+    bonusBadge: "+{bonus} stat",
+    shareNote: "weight {weight} · share {share}"
+  },
+  cabinet: {
+    kicker: "Spectator and Second's Cabinet",
+    title: "OAuth sign-in, ballots, reputation, and seasonal proposal",
+    subtitle:
+      "A single account links Telegram, Google (YouTube), and VK ID. Every victory of your chosen side awards +1 reputation point regardless of vote weight.",
+    oauthTitle: "Sign-in and linked social accounts (OAuth)",
+    oauthLead:
+      "Instagram and TikTok serve as publishing channels for daily cards and short videos, while sybil-resistant sign-in uses Telegram Login, Google, and VK ID.",
+    connectTelegram: "Sign in / link Telegram",
+    connectGoogle: "Sign in / link Google",
+    connectVk: "Sign in / link VK ID",
+    logout: "Sign out",
+    linkedProviders: "Linked sign-in providers",
+    statsReputation: "Reputation",
+    statsWins: "Winning sides",
+    statsVotes: "Ballots cast",
+    statsStreak: "Streak (best: {best})",
+    achievementsTitle: "Second's achievements",
+    noAchievements: "Cast your first ballot on an open dispute to unlock your first achievement.",
+    achFirstBallot: "First Ballot — took part in preparing a dispute",
+    achFirstVictory: "First Vindication — your chosen hero won the meeting",
+    achStreak3: "Threefold Streak — three winning sides in a row",
+    achOracle5: "Five Verdicts — five closed protocols won by your side",
+    achPatronProposer: "Convocation Author — submitted a moderated proposal to the pool",
+    ballotsOpenTitle: "Open ballots (awaiting settlement)",
+    ballotsClosedTitle: "Closed ballots and reputation awarded",
+    noBallots: "No ballots cast yet.",
+    wonPoint: "+1 reputation (side won)",
+    noPoint: "0 (other side won or draw)",
+    proposalTitle: "Seasonal proposal: own hero or skill (threshold: {threshold} rep.)",
+    proposalLead:
+      "Once per season after reaching the reputation threshold, you may propose a public-domain hero or a new skill for an existing hero. Proposals enter moderation and never alter a live seed automatically.",
+    proposalLocked: "Earn {need} more reputation on open disputes to unlock this season's proposal form.",
+    proposalKindHero: "New hero (public domain)",
+    proposalKindSkill: "New skill for an existing hero",
+    proposalNameLabel: "Hero name or skill title",
+    proposalOriginLabel: "Literary / mythic source and domain",
+    proposalDescLabel: "Epithet and rhetorical effect in dispute",
+    proposalAttestPd: "I confirm that the character and plot basis are in the public domain (no studio likenesses)",
+    proposalGrantLicense: "I grant the project a royalty-free non-exclusive license to use the submitted text",
+    proposalSubmit: "Submit proposal for moderation",
+    proposalPendingBadge: "In moderation · Season #{season}",
+    leaderboardTitle: "Seconds leaderboard by reputation"
+  },
+  channels: {
+    dailyCardTitle: "Showcase for Telegram, VK, Shorts, and Reels",
+    dailyCardLead:
+      "Ready-made dual-emblem card and daily digest for social channels and vertical short videos.",
+    downloadSvgCard: "Open SVG poster card (1080×1080) →",
+    copyPostText: "Announcement copy for Telegram / VK",
+    commentaryTitle: "Analytical protocol recap",
+    commentaryBadge: "Recap from exchange numbers · no copyrighted book quotes"
   },
   dispute: {
     dayLine: "{stage} · Day {day} ({date})",

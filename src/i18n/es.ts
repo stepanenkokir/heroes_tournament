@@ -17,10 +17,11 @@ export const es: Messages = {
     current: "Copa actual",
     archive: "Archivo de copas",
     ratings: "Clasificación y pruebas",
-    rules: "Reglas y fórmula"
+    rules: "Reglas y fórmula",
+    cabinet: "Gabinete y votos"
   },
   footer: {
-    line: "Portal de espectadores de certámenes intelectuales (16 héroes, 6 dominios, una fórmula de intercambio limpia).",
+    line: "Portal de espectadores de certámenes intelectuales (plantel de 50 héroes, 16 por copa, 6 dominios, una fórmula limpia).",
     timezone: "Zona horaria del calendario y del cierre del día: Europe/Moscow"
   },
   locale: { label: "Idioma de la interfaz" },
@@ -29,10 +30,10 @@ export const es: Messages = {
     kicker: "Cartel del día · {date} · Europe/Moscow",
     title: "Disputas de hoy: las habilidades están abiertas, el resultado llega mañana",
     subtitle:
-      "Cada mañana el portal cierra los protocolos de ayer y anuncia dos dominantes y dos apelaciones para los encuentros de hoy. El tercer par permanece bajo lacre por si hay empate en la eliminatoria.",
+      "Cada mañana el portal cierra los protocolos de ayer y anuncia dos dominantes y dos apelaciones para los encuentros de hoy. Antes del mediodía el público puede votar para reforzar una característica en los cruces próximos.",
     openCup: "Abrir la tabla y el calendario de la copa →",
-    openRatings: "Elo y pruebas de los 16 héroes",
-    openRules: "Fórmula del reconocimiento y anillo de dominios",
+    openRatings: "Elo y pruebas de los 50 héroes",
+    openRules: "Fórmula del reconocimiento, temas y código legal",
     billboardTitle: "Cartel del día · disputas: {count}",
     billboardSubtitle:
       "Ya se conocen dos habilidades de ataque (dominantes) y dos de respuesta (apelaciones). El marcador aparece a las 00:00, hora de Moscú.",
@@ -45,7 +46,7 @@ export const es: Messages = {
     overall: "EN LA GENERAL",
     archiveTitle: "Archivo de copas terminadas",
     archiveSubtitle:
-      "Tres torneos jugados por completo (31 disputas cada uno), con tablas de grupo y cuadro eliminatorio.",
+      "Diez torneos jugados por completo (abiertos y temáticos, 31 disputas cada uno), con tablas de grupo y cuadro eliminatorio.",
     allTournaments: "Todos los torneos →",
     completed: "Terminado · {edition}",
     champion: "Poseedor de la Copa",
@@ -230,20 +231,20 @@ export const es: Messages = {
   },
   rules: {
     kicker: "Código y matemáticas del torneo",
-    edition: "Edición del reglamento · 16 héroes · 6 dominios",
-    title: "Reglas de la disputa intelectual y fórmulas de cálculo",
+    edition: "Edición del reglamento · plantel de 50 héroes · 16 por copa · 6 dominios",
+    title: "Reglas de la disputa intelectual, votación del público y fuentes",
     lead: "En el Torneo de Héroes no hay daño físico ni pelea: el certamen es una disputa pública, donde los participantes presionan con dominantes y sostienen la posición con apelaciones.",
-    s1Title: "1. Habilidades del héroe: 5 dominantes y 5 apelaciones",
-    s1Lead: "Cada uno de los 16 héroes tiene exactamente 10 habilidades de autor:",
+    s1Title: "1. Plantel de 50 héroes, temas y habilidades",
+    s1Lead: "El plantel reúne 50 héroes de dominio público; cada copa sortea 16 participantes por semilla determinista (Sorteo abierto o tema: Mito y bylina, Camino y mar, Pícaros, Argumento directo). Cada héroe tiene 10 habilidades de autor:",
     s1Dom: "5 dominantes — tesis con las que el héroe presiona. Características: Agudeza (30–90) y Profundidad (30–90).",
     s1App: "5 apelaciones — respuestas a las que el héroe recurre para defender la posición. Características: Firmeza (30–90) e Ingenio (30–90).",
     s1Day: "El día de la disputa se abren 2 dominantes y 2 apelaciones de cada héroe. El tercer par se sortea enseguida y queda lacrado: solo se abre si el reconocimiento queda empatado en la eliminatoria.",
     s2Title: "2. El anillo de los seis dominios",
     s2Lead:
       "Los dominios forman un anillo: cada uno vence al siguiente de la cadena (multiplicador ×1.2) y cede ante el anterior (multiplicador ×0.8). En el resto de combinaciones el coeficiente es ×1.0.",
-    s3Title: "3. Fórmula de un intercambio",
+    s3Title: "3. Fórmula de un intercambio e instantánea de votos",
     s3Lead:
-      "La serie principal tiene cuatro intercambios: A1→B1, B1→A1, A2→B2, B2→A2. Ambos héroes juegan exactamente dos dominantes, así que no hay ventaja de salir primero.",
+      "La serie principal tiene cuatro intercambios: A1→B1, B1→A1, A2→B2, B2→A2. Antes del anuncio del día, cada espectador puede emitir una papeleta por encuentro (presupuesto 6 puntos, peso previo 24, tope +3 por característica dentro de 30–90). El plantel base nunca muta.",
     formula:
       "press = agudeza * (0.7 + 0.3 * profundidad / 100) * affinity\nhold  = firmeza * (0.7 + 0.3 * ingenio / 100)\nreconocimiento = max(0, round(press * j - hold))\nretención = round(min(press * j, hold))",
     s3Note:
@@ -263,7 +264,96 @@ export const es: Messages = {
       "Todos los héroes empiezan la historia con 1500 puntos, antes de la primera copa. La clasificación no entra en la fórmula del intercambio (el favorito puede caer por un reparto adverso de dominios), pero determina los bombos del siguiente torneo.",
     eloFormula: "E_A = 1 / (1 + 10 ^ ((R_B - R_A) / 400))\ndelta = round(K * (S - E))",
     s5Note:
-      "S vale 1 (victoria), 0.5 (empate en el grupo) o 0 (derrota). Importancia de la fase: K = 20 en el grupo, K = 28 en cuartos y semifinales, K = 36 en la final. Cada delta se redondea a un entero por separado, así que en ciertos umbrales impares la suma de los dos deltas puede alejarse de cero en ±1 punto. Todos los eventos quedan en el libro abierto y se pueden recomprobar desde cero."
+      "S vale 1 (victoria), 0.5 (empate en el grupo) o 0 (derrota). Importancia de la fase: K = 20 en el grupo, K = 28 en cuartos y semifinales, K = 36 en la final. Cada delta se redondea a un entero por separado, así que en ciertos umbrales impares la suma de los dos deltas puede alejarse de cero en ±1 punto. Todos los eventos quedan en el libro abierto y se pueden recomprobar desde cero.",
+    s6Title: "6. Fuentes de dominio público, propuestas y exclusión de apuestas",
+    s6Lead:
+      "Los 50 héroes proceden exclusivamente del mito, el folclore y la literatura clásica de dominio público (Homero, las Eddas, bylinas eslavas, Las mil y una noches, Shakespeare, Cervantes, Dumas, Goethe, Beaumarchais, Swift, Poe, Austen, Verne, Carroll, Luo Guanzhong, Wu Cheng'en). No se emplean imágenes de estudios ni cómics, sino monogramas SVG propios y textos originales.",
+    s6PublicDomain:
+      "El resumen analítico del protocolo se genera a partir de los números del intercambio y los dominios sin citar traducciones protegidas.",
+    s6Submissions:
+      "Las propuestas de nuevos héroes o habilidades se desbloquean al alcanzar el umbral de reputación (1 por temporada), pasan por moderación obligatoria y exigen confirmación de dominio público y licencia no exclusiva al proyecto.",
+    s6NoBetting:
+      "El portal no acepta apuestas de dinero sobre el resultado ni entrega premios en metálico. El apoyo a un lado opera solo dentro del presupuesto fijo del encuentro (BUDGET = 6, PRIOR = 24, tope +3 por característica) y no multiplica la reputación."
+  },
+  themes: {
+    open: "Sorteo abierto (los 50 héroes)",
+    myth_bylina: "Tema: Mito y bylina",
+    road_sea: "Tema: Camino y mar",
+    tricksters: "Tema: Pícaros y enigmas",
+    direct_argument: "Tema: Argumento directo"
+  },
+  voting: {
+    sectionTitle: "Votación del público antes de abrir la jornada",
+    sectionSubtitle:
+      "Mientras se conoce el cruce y la disputa sigue «En el calendario», cada espectador puede enviar una papeleta a una característica de habilidad. A las 12:00 (Europe/Moscow) se cierra la ventana y se congela la instantánea.",
+    openWindowBadge: "Ventana de voto abierta",
+    frozenBadge: "Instantánea congelada",
+    budgetFormula: "Fórmula del público: share = W / (W_match + 24) · raw = 6 × share · tope +3 (30..90)",
+    chooseSide: "1. Lado de la disputa",
+    chooseSkill: "2. Habilidad del héroe",
+    chooseStat: "3. Característica",
+    statPrimary: "Primaria (Agudeza / Firmeza)",
+    statSecondary: "Secundaria (Profundidad / Ingenio)",
+    submitVote: "Guardar papeleta en la instantánea",
+    savedNotice: "Papeleta registrada. Puedes cambiarla hasta el anuncio de habilidades.",
+    signInPrompt: "Inicia sesión en el Gabinete (Telegram / Google / VK ID) para votar y sumar reputación.",
+    noShiftsYet: "No se registraron votos del público para esta disputa (estadísticas base del plantel).",
+    crowdShifted: "El público desplazó estas características antes del inicio:",
+    bonusBadge: "+{bonus} caract.",
+    shareNote: "peso {weight} · cuota {share}"
+  },
+  cabinet: {
+    kicker: "Gabinete del espectador y padrino",
+    title: "Acceso OAuth, papeletas, reputación y propuesta de temporada",
+    subtitle:
+      "Una sola cuenta vincula Telegram, Google (YouTube) y VK ID. Cada victoria del lado elegido otorga +1 punto de reputación sin importar el peso del voto.",
+    oauthTitle: "Acceso y vinculación de perfiles sociales (OAuth)",
+    oauthLead:
+      "Instagram y TikTok funcionan como escaparates de vídeo corto y carteles del día, mientras que el acceso contra bots usa Telegram Login, Google y VK ID.",
+    connectTelegram: "Entrar / vincular Telegram",
+    connectGoogle: "Entrar / vincular Google",
+    connectVk: "Entrar / vincular VK ID",
+    logout: "Cerrar sesión",
+    linkedProviders: "Accesos vinculados",
+    statsReputation: "Reputación",
+    statsWins: "Lados ganadores",
+    statsVotes: "Papeletas",
+    statsStreak: "Racha (máx.: {best})",
+    achievementsTitle: "Logros de padrino",
+    noAchievements: "Emite tu primera papeleta en una disputa abierta para desbloquear el primer logro.",
+    achFirstBallot: "Primera Papeleta — participación en la preparación de una disputa",
+    achFirstVictory: "Primer Acierto — tu héroe elegido ganó el encuentro",
+    achStreak3: "Racha Triple — tres elecciones ganadoras seguidas",
+    achOracle5: "Cinco Fallos — cinco protocolos cerrados a favor de tu lado",
+    achPatronProposer: "Autor de Convocatoria — propuesta enviada a moderación",
+    ballotsOpenTitle: "Papeletas abiertas (pendientes de cierre)",
+    ballotsClosedTitle: "Papeletas cerradas y reputación otorgada",
+    noBallots: "Todavía no hay papeletas registradas.",
+    wonPoint: "+1 reputación (el lado ganó)",
+    noPoint: "0 (ganó el otro lado o empate)",
+    proposalTitle: "Propuesta de temporada: héroe o habilidad (umbral: {threshold} rep.)",
+    proposalLead:
+      "Una vez por temporada al alcanzar el umbral de reputación puedes proponer un héroe de dominio público o una habilidad para un héroe existente. La propuesta pasa por moderación y no altera la semilla en curso.",
+    proposalLocked: "Suma {need} puntos más de reputación en disputas abiertas para desbloquear el formulario.",
+    proposalKindHero: "Nuevo héroe (dominio público)",
+    proposalKindSkill: "Nueva habilidad para un héroe existente",
+    proposalNameLabel: "Nombre del héroe o título de la habilidad",
+    proposalOriginLabel: "Fuente literaria / mítica y dominio",
+    proposalDescLabel: "Epíteto y efecto retórico en la disputa",
+    proposalAttestPd: "Confirmo que el personaje y su base argumental pertenecen al dominio público (sin imágenes de estudios)",
+    proposalGrantLicense: "Concedo al proyecto una licencia gratuita y no exclusiva para usar el texto enviado",
+    proposalSubmit: "Enviar propuesta a moderación",
+    proposalPendingBadge: "En moderación · Temporada #{season}",
+    leaderboardTitle: "Clasificación de padrinos por reputación"
+  },
+  channels: {
+    dailyCardTitle: "Escaparate para Telegram, VK, Shorts y Reels",
+    dailyCardLead:
+      "Tarjeta lista con ambos emblemas y resumen del día para canales sociales y vídeo vertical.",
+    downloadSvgCard: "Abrir cartel SVG del día (1080×1080) →",
+    copyPostText: "Texto del anuncio para Telegram / VK",
+    commentaryTitle: "Resumen analítico del protocolo",
+    commentaryBadge: "Resumen por cifras del intercambio · sin citas protegidas"
   },
   dispute: {
     dayLine: "{stage} · Día {day} ({date})",

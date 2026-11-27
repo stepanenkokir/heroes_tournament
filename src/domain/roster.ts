@@ -1,4 +1,6 @@
-import type { DomainId, HeroDefinition, HeroSkill } from "./types";
+import { EXTRA_ROSTER_PART_1 } from "./roster-extra-1";
+import { EXTRA_ROSTER_PART_2 } from "./roster-extra-2";
+import type { DomainId, HeroCorpus, HeroDefinition, HeroMotif, HeroSkill } from "./types";
 
 interface CompactSkillSpec {
   title: string;
@@ -16,6 +18,8 @@ interface CompactHeroSpec {
   epithet: string;
   emblemKey: string;
   accentHex: string;
+  corpora?: readonly HeroCorpus[];
+  motifs?: readonly HeroMotif[];
   dominants: [
     CompactSkillSpec,
     CompactSkillSpec,
@@ -31,6 +35,25 @@ interface CompactHeroSpec {
     CompactSkillSpec
   ];
 }
+
+const BASE_HERO_TAGS: Record<string, { corpora: readonly HeroCorpus[]; motifs: readonly HeroMotif[] }> = {
+  odysseus: { corpora: ["hellenic"], motifs: ["voyage", "trickster", "reason"] },
+  "sherlock-holmes": { corpora: ["letters"], motifs: ["reason", "will"] },
+  heracles: { corpora: ["hellenic"], motifs: ["will", "voyage", "honor"] },
+  vasilisa: { corpora: ["slavic"], motifs: ["reason", "will"] },
+  "don-quixote": { corpora: ["chivalry", "letters"], motifs: ["voyage", "honor", "will"] },
+  alice: { corpora: ["letters"], motifs: ["voyage", "trickster", "reason"] },
+  "robin-hood": { corpora: ["chivalry"], motifs: ["trickster", "honor", "voyage"] },
+  "sun-wukong": { corpora: ["east"], motifs: ["voyage", "trickster", "will"] },
+  "king-arthur": { corpora: ["chivalry"], motifs: ["honor", "will"] },
+  sindbad: { corpora: ["arab"], motifs: ["voyage", "trickster"] },
+  dartagnan: { corpora: ["chivalry", "letters"], motifs: ["voyage", "honor", "will"] },
+  "ilya-muromets": { corpora: ["slavic"], motifs: ["will", "honor"] },
+  "elizabeth-bennet": { corpora: ["letters"], motifs: ["reason", "honor"] },
+  "captain-nemo": { corpora: ["letters"], motifs: ["voyage", "reason", "will"] },
+  thor: { corpora: ["norse"], motifs: ["will", "honor", "voyage"] },
+  cinderella: { corpora: ["letters"], motifs: ["honor", "will"] }
+};
 
 function expandHero(spec: CompactHeroSpec): HeroDefinition {
   const dominants: HeroSkill[] = spec.dominants.map((s, idx) => ({
@@ -57,6 +80,8 @@ function expandHero(spec: CompactHeroSpec): HeroDefinition {
     secondaryStat: s.secondary
   }));
 
+  const fallback = BASE_HERO_TAGS[spec.id];
+
   return {
     id: spec.id,
     slug: spec.slug,
@@ -65,6 +90,8 @@ function expandHero(spec: CompactHeroSpec): HeroDefinition {
     epithet: spec.epithet,
     emblemKey: spec.emblemKey,
     accentHex: spec.accentHex,
+    corpora: spec.corpora ?? fallback?.corpora ?? ["letters"],
+    motifs: spec.motifs ?? fallback?.motifs ?? ["reason"],
     dominants,
     appeals
   };
@@ -1401,7 +1428,11 @@ const COMPACT_ROSTER: readonly CompactHeroSpec[] = [
   }
 ];
 
-export const HERO_ROSTER: readonly HeroDefinition[] = COMPACT_ROSTER.map(expandHero);
+export const HERO_ROSTER: readonly HeroDefinition[] = [
+  ...COMPACT_ROSTER,
+  ...EXTRA_ROSTER_PART_1,
+  ...EXTRA_ROSTER_PART_2
+].map(expandHero);
 
 export const HERO_BY_ID: ReadonlyMap<string, HeroDefinition> = new Map(
   HERO_ROSTER.map((h) => [h.id, h])

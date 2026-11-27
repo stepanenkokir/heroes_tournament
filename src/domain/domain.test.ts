@@ -2,14 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   calculateEloUpdate,
   computeGroupStandings,
+  computeVoteSnapshot,
   drawGroupsByPots,
   EMBLEM_DESCRIPTORS,
   evaluateExchange,
   getDomainAffinity,
+  getEligibleHeroesForTheme,
+  HERO_BY_ID,
   HERO_ROSTER,
   INITIAL_ELO_RATING,
   resolvePlayoffPairings,
+  selectTournamentField,
   simulateDispute,
+  TOURNAMENT_THEME_IDS,
   verifyRatingLedger,
   type GroupAssignment,
   type HeroDefinition,
@@ -54,6 +59,8 @@ function makeHero(
     epithet: "Испытатель",
     emblemKey: "owl",
     accentHex: "#b8442a",
+    corpora: ["letters"],
+    motifs: ["reason"],
     dominants,
     appeals
   };
@@ -397,12 +404,14 @@ describe("Эло и журнал рейтинга", () => {
     expect(check.mismatches).toHaveLength(0);
   });
 
-  it("содержит ровно 16 героев с 5 доминантами, 5 апелляциями, статами 30..90 и SVG-вензелями", () => {
-    expect(HERO_ROSTER).toHaveLength(16);
+  it("содержит ровно 50 героев с 5 доминантами, 5 апелляциями, статами 30..90, SVG-вензелями и метками", () => {
+    expect(HERO_ROSTER).toHaveLength(50);
     for (const hero of HERO_ROSTER) {
       expect(hero.dominants).toHaveLength(5);
       expect(hero.appeals).toHaveLength(5);
       expect(EMBLEM_DESCRIPTORS[hero.emblemKey]).toBeDefined();
+      expect(hero.corpora.length).toBeGreaterThan(0);
+      expect(hero.motifs.length).toBeGreaterThan(0);
 
       for (const skill of [...hero.dominants, ...hero.appeals]) {
         expect(skill.primaryStat).toBeGreaterThanOrEqual(30);
@@ -411,5 +420,72 @@ describe("Эло и журнал рейтинга", () => {
         expect(skill.secondaryStat).toBeLessThanOrEqual(90);
       }
     }
+  });
+
+  it("каждая тема набирает не меньше 16 героев и детерминированно отбирает ровно 16 участников", () => {
+    const entrants = HERO_ROSTER.map((h) => ({ heroId: h.id, entryRating: 1500 }));
+
+    for (const themeId of TOURNAMENT_THEME_IDS) {
+      const eligible = getEligibleHeroesForTheme(HERO_ROSTER, "theme", themeId);
+      expect(eligible.length, `theme ${themeId}`).toBeGreaterThanOrEqual(16);
+
+      const field1 = selectTournamentField(entrants, HERO_BY_ID, {
+        fieldKind: "theme",
+        themeId,
+        seed: `test-theme-${themeId}`
+      });
+      const field2 = selectTournamentField(entrants, HERO_BY_ID, {
+        fieldKind: "theme",
+        themeId,
+        seed: `test-theme-${themeId}`
+      });
+
+      expect(field1).toHaveLength(16);
+      expect(new Set(field1.map((e) => e.heroId)).size).toBe(16);
+      expect(field1).toEqual(field2);
+    }
+
+    const openField = selectTournamentField(entrants, HERO_BY_ID, {
+      fieldKind: "open",
+      seed: "test-open-seed"
+    });
+    expect(openField).toHaveLength(16);
+  });
+
+  it("пересчитывает голоса с бюджетом 6, prior 24 и потолком +3 без мутации базового ростера", () => {
+    const tenVotes = Array.from({ length: 10 }, (_, idx) => ({
+      userId: `u-${idx}`,
+      heroId: "odysseus",
+      skillId: "odysseus:dom:1",
+      stat: "primary" as const,
+      weight: 1 as const
+    }));
+    const snap10 = computeVoteSnapshot(tenVotes);
+    expect(snap10.totalMatchWeight).toBe(10);
+    expect(snap10.adjustments[0]?.appliedBonus).toBe(2);
+
+    const fortyVotes = Array.from({ length: 40 }, (_, idx) => ({
+      userId: `u-${idx}`,
+      heroId: "odysseus",
+      skillId: "odysseus:dom:1",
+      stat: "primary" as const,
+      weight: 1 as const
+    }));
+    const snap40 = computeVoteSnapshot(fortyVotes);
+    expect(snap40.adjustments[0]?.appliedBonus).toBe(3);
+
+    const baseHeroA = HERO_BY_ID.get("odysseus")!;
+    const baseHeroB = HERO_BY_ID.get("sherlock-holmes")!;
+    const baseStatBefore = baseHeroA.dominants[0]!.primaryStat;
+
+    simulateDispute({
+      heroA: baseHeroA,
+      heroB: baseHeroB,
+      stage: "group",
+      seed: "vote-mod-test",
+      modifiers: snap40.adjustments
+    });
+
+    expect(baseHeroA.dominants[0]!.primaryStat).toBe(baseStatBefore);
   });
 });

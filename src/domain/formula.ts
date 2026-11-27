@@ -1,5 +1,6 @@
 import { getDomainAffinity } from "./domains";
 import { createSeededRng, deterministicCoinFlip, getDeterministicJitter } from "./rng";
+import { applyVoteModifiersToHero } from "./voting";
 import type {
   DisputeAnnouncement,
   DisputeResolution,
@@ -10,7 +11,8 @@ import type {
   ExchangeStepResult,
   HeroDefinition,
   HeroSkill,
-  SkillDrawOrder
+  SkillDrawOrder,
+  SkillStatModifier
 } from "./types";
 
 export const DECISIVE_ACCEPTANCE_THRESHOLD = 12;
@@ -119,12 +121,15 @@ export interface SimulateDisputeOptions {
   stage: DisputeStage;
   seed: string;
   announcement?: DisputeAnnouncement;
+  modifiers?: readonly SkillStatModifier[];
 }
 
 export function simulateDispute(options: SimulateDisputeOptions): DisputeSimulationResult {
-  const { heroA, heroB, stage, seed } = options;
+  const { heroA, heroB, stage, seed, modifiers = [] } = options;
   const announcement = options.announcement ?? drawAnnouncement(heroA, heroB, seed);
-  const skillMap = createSkillLookup(heroA, heroB);
+  const effectiveHeroA = applyVoteModifiersToHero(heroA, modifiers);
+  const effectiveHeroB = applyVoteModifiersToHero(heroB, modifiers);
+  const skillMap = createSkillLookup(effectiveHeroA, effectiveHeroB);
 
   const getSkill = (id: string): HeroSkill => {
     const found = skillMap.get(id);
